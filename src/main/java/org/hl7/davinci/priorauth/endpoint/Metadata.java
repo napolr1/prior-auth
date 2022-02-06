@@ -108,6 +108,16 @@ public class Metadata {
     security.addExtension(oauthUris);
     rest.setSecurity(security);
 
+    //////// Patient resource added for the patient identity IG /////
+    // Patient Resource
+    CapabilityStatementRestResourceComponent patient = new CapabilityStatementRestResourceComponent();
+    patient.setType("Patient");
+    patient.addInteraction().setCode(TypeRestfulInteraction.READ);
+    patient.addInteraction().setCode(TypeRestfulInteraction.SEARCHTYPE);
+    patient.addInteraction().setCode(TypeRestfulInteraction.DELETE);
+    patient.addOperation().setName("$match").setDefinition("http://hl7.org/fhir/OperationDefinition/Patient-match");
+    rest.addResource(patient);
+
     // Claim Resource
     CapabilityStatementRestResourceComponent claim = new CapabilityStatementRestResourceComponent();
     claim.setType("Claim");
