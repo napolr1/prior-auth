@@ -18,6 +18,13 @@ BEGIN TRANSACTION;
         FOREIGN KEY ("related") REFERENCES Claim("id") ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS Patient (
+        "id" varchar PRIMARY KEY,
+        "patient" varchar,
+        "timestamp" datetime DEFAULT CURRENT_TIMESTAMP,
+        "resource" clob
+      );
+
     CREATE TABLE IF NOT EXISTS ClaimResponse (
         "id" varchar PRIMARY KEY,
         "claimId" varchar,

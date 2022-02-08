@@ -32,6 +32,7 @@ import org.hl7.davinci.priorauth.Database.Table;
 import org.hl7.davinci.ruleutils.CqlUtils;
 import org.hl7.davinci.rules.PriorAuthRule;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Claim;
 import org.hl7.fhir.r4.model.ClaimResponse;
 import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
@@ -46,6 +47,11 @@ public class DebugEndpoint {
   @GetMapping("/Bundle")
   public ResponseEntity<String> getBundles(HttpServletRequest request) {
     return query(Table.BUNDLE, request);
+  }
+
+  @GetMapping("/Patient")
+  public ResponseEntity<String> getPatients(HttpServletRequest request) {
+    return query(Table.PATIENT, request);
   }
 
   @GetMapping("/Claim")
@@ -185,6 +191,7 @@ public class DebugEndpoint {
 
     try {
       // Submit a claim and then update twice
+      writePatient(getResource("Patient.json"));
       writeClaim(getResource("Claim.json"), null, "2200-09-09 15:23:34.1");
       writeClaimResponse(getResource("DeniedResponse.json"), "451fe716-4701-4cdf-b5bb-a6eedbe43bbb",
           "2200-09-09 15:23:39.5");
@@ -220,6 +227,23 @@ public class DebugEndpoint {
     java.nio.file.Path fixture = modulesFolder.resolve(fileName);
     FileInputStream inputStream = new FileInputStream(fixture.toString());
     return (Bundle) App.getFhirContext().newJsonParser().parseResource(inputStream);
+  }
+
+  private static boolean writePatient(Bundle patientBundle) {
+    boolean status = false;
+    for (int i = 0; i < patientBundle.getEntry().size(); i++) {
+      Patient pt  = (Patient) patientBundle.getEntry().get(i).getResource();
+      String id = FhirUtils.getIdFromResource(pt);
+      String patient = pt.hasIdentifier() ? pt.getIdentifierFirstRep().getValue() : null;
+      App.getDB().delete(Table.PATIENT, id, patient);
+      Map<String, Object> dataMap = new HashMap<>();
+      dataMap.put("id", id);
+      dataMap.put("patient", patient);
+      dataMap.put("resource", pt);
+      dataMap.put("timestamp", "2200-09-10 08:43:32.9");
+      status = App.getDB().write(Table.PATIENT, dataMap);
+    }
+    return status;
   }
 
   private static boolean writeClaim(Bundle claimBundle, String related, String timestamp) {

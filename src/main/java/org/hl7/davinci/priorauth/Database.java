@@ -32,7 +32,7 @@ public class Database {
 
   public enum Table {
     BUNDLE("Bundle"), CLAIM("Claim"), CLAIM_ITEM("ClaimItem"), CLAIM_RESPONSE("ClaimResponse"),
-    SUBSCRIPTION("Subscription"), RULES("Rules"), AUDIT("Audit"), CLIENT("Client");
+    SUBSCRIPTION("Subscription"), RULES("Rules"), AUDIT("Audit"), CLIENT("Client"), PATIENT("Patient");
 
     private final String value;
 
@@ -198,9 +198,14 @@ public class Database {
     Bundle results = new Bundle();
     results.setType(BundleType.SEARCHSET);
     results.setTimestamp(new Date());
+    String sql;
     try (Connection connection = getConnection()) {
-      String sql = "SELECT id, patient, resource FROM " + table.value() + " WHERE "
+      if (table.value().equals("Patient") && constraintMap.isEmpty()) {
+        sql = "SELECT id, patient, resource FROM " + table.value();
+      } else {
+        sql = "SELECT id, patient, resource FROM " + table.value() + " WHERE "
           + generateClause(constraintMap, WHERE_CONCAT) + ";";
+      }
       Collection<Map<String, Object>> maps = new HashSet<Map<String, Object>>();
       maps.add(constraintMap);
       PreparedStatement stmt = generateStatement(sql, maps, connection);
@@ -518,10 +523,15 @@ public class Database {
     boolean result = false;
     if (table != null && id != null) {
       try (Connection connection = getConnection()) {
-        PreparedStatement stmt = connection
-            .prepareStatement("DELETE FROM " + table.value() + " WHERE id = ? AND patient = ?;");
-        stmt.setString(1, id);
-        stmt.setString(2, patient);
+        PreparedStatement stmt;
+        if (table.value().equals("Patient")) {
+          stmt = connection.prepareStatement("DELETE FROM " + table.value() + " WHERE id = ?;");
+          stmt.setString(1, id);
+        } else {
+          stmt = connection.prepareStatement("DELETE FROM " + table.value() + " WHERE id = ? AND patient = ?;");
+          stmt.setString(1, id);
+          stmt.setString(2, patient);
+        }
         stmt.execute();
         result = stmt.getUpdateCount() > 0 ? true : false;
       } catch (SQLException e) {

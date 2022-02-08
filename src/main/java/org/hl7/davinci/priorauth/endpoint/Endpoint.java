@@ -7,20 +7,22 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.hl7.davinci.priorauth.App;
 import org.hl7.davinci.priorauth.Audit;
-import org.hl7.davinci.priorauth.FhirUtils;
-import org.hl7.davinci.priorauth.PALogger;
 import org.hl7.davinci.priorauth.Audit.AuditEventOutcome;
 import org.hl7.davinci.priorauth.Audit.AuditEventType;
 import org.hl7.davinci.priorauth.Database.Table;
+import org.hl7.davinci.priorauth.FhirUtils;
+import org.hl7.davinci.priorauth.PALogger;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Claim;
 import org.hl7.fhir.r4.model.OperationOutcome;
-import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
 import org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity;
 import org.hl7.fhir.r4.model.OperationOutcome.IssueType;
+import org.hl7.fhir.r4.model.Patient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
 
 public class Endpoint {
 
@@ -30,6 +32,7 @@ public class Endpoint {
         XML, JSON
     }
 
+    static String REQUIRES_PT_ID = "Instance ID is required: DELETE Patient/{id}";
     static String REQUIRES_ID = "Instance ID is required: DELETE {resourceType}?identifier=";
     static String REQUIRES_PATIENT = "Patient Identifier is required: DELETE {resourceType}?patient.identifier=";
     static String DELETED_MSG = "Deleted resource and all related and referenced resources.";
@@ -49,7 +52,7 @@ public class Endpoint {
         logger.info("GET /" + table.value() + ":" + constraintMap.toString() + " fhir+" + requestType.name());
         App.setBaseUrl(Endpoint.getServiceBaseUrl(request));
         String referenceUrl = table.value() + "/" + constraintMap.get("id");
-        if (!constraintMap.containsKey("patient")) {
+        if (!constraintMap.containsKey("patient") && !table.value().equals("Patient")) {
             logger.warning("Endpoint::read:patient null");
             String description = "Attempted to read " + table.value() + " but is unathorized";
             Audit.createAuditEvent(AuditEventType.QUERY, AuditEventAction.R, AuditEventOutcome.MINOR_FAILURE, referenceUrl, request,
@@ -58,6 +61,9 @@ public class Endpoint {
         }
         String formattedData = null;
         String description = "Read " + referenceUrl;
+        if (table.value().equals("Patient") && (!constraintMap.containsKey("patient") || constraintMap.get("patient") == null))
+            constraintMap.remove("patient");
+        
         if ((!constraintMap.containsKey("id") || constraintMap.get("id") == null)
                 && (!constraintMap.containsKey("claimId") || constraintMap.get("claimId") == null)) {
             // Search
@@ -81,6 +87,9 @@ public class Endpoint {
             } else if (table == Table.CLAIM) {
                 Claim claim = (Claim) baseResource;
                 formattedData = FhirUtils.getFormattedData(claim, requestType);
+            } else if (table == Table.PATIENT) {
+                Patient patient = (Patient) baseResource;
+                formattedData = FhirUtils.getFormattedData(patient, requestType);
             } else if (table == Table.CLAIM_RESPONSE) {
                 Bundle bundleResponse = (Bundle) baseResource;
                 formattedData = FhirUtils.getFormattedData(bundleResponse, requestType);
@@ -109,7 +118,12 @@ public class Endpoint {
      */
     public static ResponseEntity<String> delete(String id, String patient, Table table, HttpServletRequest request,
             RequestType requestType) {
-        logger.info("DELETE /" + table.value() + ":" + id + "/" + patient + " fhir+" + requestType.name());
+        if (table.value().equals("Patient")) {
+            logger.info("DELETE /" + table.value() + ":" + id + "/" + " fhir+" + requestType.name());
+        } else {
+            logger.info("DELETE /" + table.value() + ":" + id + "/" + patient + " fhir+" + requestType.name());
+        }
+
         HttpStatus status = HttpStatus.OK;
         OperationOutcome outcome = null;
         AuditEventOutcome auditOutcome = AuditEventOutcome.MINOR_FAILURE;
@@ -118,8 +132,9 @@ public class Endpoint {
             // Do not delete everything
             // ID is required...
             status = HttpStatus.BAD_REQUEST;
-            outcome = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.REQUIRED, REQUIRES_ID);
-        } else if (patient == null) {
+            outcome = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.REQUIRED, 
+              table.value().equals("Patient") ? REQUIRES_PT_ID : REQUIRES_ID);
+        } else if (patient == null && !table.value().equals("Patient")) {
             // Do not delete everything
             // Patient ID is required...
             status = HttpStatus.BAD_REQUEST;
