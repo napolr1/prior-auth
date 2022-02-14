@@ -59,7 +59,6 @@ public class PatientEndpointTest {
     Patient patient = (Patient) App.getFhirContext().newJsonParser().parseResource(inputStream);
     Map<String, Object> patientMap = new HashMap<String, Object>();
     patientMap.put("id", "pat013");
-    patientMap.put("patient", "98765400001AZ");
     patientMap.put("resource", patient);
     App.getDB().write(Table.PATIENT, patientMap);
   }

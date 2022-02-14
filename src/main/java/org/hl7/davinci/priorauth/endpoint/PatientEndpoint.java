@@ -36,9 +36,9 @@ import org.hl7.davinci.priorauth.endpoint.Endpoint.RequestType;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.Parameters;
+import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity;
 import org.hl7.fhir.r4.model.OperationOutcome.IssueType;
@@ -57,6 +57,8 @@ public class PatientEndpoint {
   static final String REQUIRES_PATIENT = "Patient resource must be the first element of Parameters.parameter";
   static final String REQUIRES_MIN_CRITERIA = "The request does not conform to the specification. Patient resource does not have the minimum search field";
   static final String PROCESS_FAILED = "Unable to process the request properly. Check the log for more details.";
+  static final String BASE_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient";
+  static final String LEVEL1_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1";
   // JSON output
   @GetMapping(value = {"", "/{id}"}, produces = { MediaType.APPLICATION_JSON_VALUE, "application/fhir+json" })
   public ResponseEntity<String> readPatientJson(HttpServletRequest request,
@@ -126,6 +128,7 @@ public class PatientEndpoint {
       IParser parser = requestType == RequestType.JSON ? App.getFhirContext().newJsonParser()
           : App.getFhirContext().newXmlParser();
       IBaseResource resource = parser.parseResource(body);
+      logger.info("PatientEndpoint::MatchOperationParsedInput: " + resource.toString());
       // First check if the input is a Parameters resource
       if (resource instanceof Parameters) {
         Parameters parameters = (Parameters) resource;
@@ -133,7 +136,7 @@ public class PatientEndpoint {
         if (parameters.hasParameter() && (!parameters.getParameter().isEmpty()) && parameters.getParameter().get(0).hasResource() 
           && parameters.getParameter().get(0).getResource().getResourceType() == ResourceType.Patient) {
             Patient patient = (Patient) parameters.getParameter().get(0).getResource();
-            // TODO: check the minimum elements are provided.
+            // Validate the minimum search criteria.
             if (validateMinimumRequirement(patient)) {
               // logic for match
             } else {
@@ -162,7 +165,10 @@ public class PatientEndpoint {
         logger.severe("PatientEndpoint::MatchOperation:Body is not a Parameters resource");
       }
     } catch (Exception e) {
-      //TODO: handle exception
+      // Spectacular faillure of the match request
+      OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.FATAL, IssueType.STRUCTURE, e.getMessage());
+      formattedData = FhirUtils.getFormattedData(error, requestType);
+      auditOutcome = AuditEventOutcome.SERIOUS_FAILURE;
     }
     Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, auditOutcome, null, request, "POST /Patient/$match");
     MediaType contentType = requestType == RequestType.JSON ? MediaType.APPLICATION_JSON : MediaType.APPLICATION_XML;
@@ -182,33 +188,21 @@ public class PatientEndpoint {
    * @return - true if constraints are validated, false otherwise
    */
   private boolean validateMinimumRequirement(Patient patient) {
-    String profile = patient.getMeta().getProfile().get(0).asStringValue();
-    Boolean hasFullName = patient.hasName() && !patient.getName().isEmpty() && patient.getName().get(0).hasFamily() && patient.getName().get(0).hasGiven();
-    Boolean hasFullAddress = patient.hasAddress() && !patient.getAddress().isEmpty() && patient.getAddress().get(0).hasLine()
-      && patient.getAddress().get(0).hasCity();
+    String profile = BASE_PROFILE;
+    if(patient.hasMeta() && patient.getMeta().hasProfile() && !patient.getMeta().getProfile().isEmpty())
+      profile = patient.getMeta().getProfile().get(0).getValue();
+    Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
+    Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
+    Boolean hasHomeAddress = FhirUtils.getPatientHomeAddress(patient) != null;
     Boolean validated = false;
     try {
-      if (profile.equals("http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient")) {
+      if (profile.equals(BASE_PROFILE)) {
         // Base level constraints
-        validated = patient.hasIdentifier() || patient.hasTelecom() || hasFullName ||hasFullAddress || patient.hasBirthDate();
+        validated = patient.hasIdentifier() || patient.hasTelecom() || hasFullName ||hasHomeAddress || patient.hasBirthDate();
       } else {
-        int indentifierWeight = ((patient.getIdentifier().get(0).getType().getCoding().get(0).getCode().equals("PPN")
-          ||patient.getIdentifier().get(0).getType().getCoding().get(0).getCode().equals("DL") ) 
-          && patient.getIdentifier().get(0).hasValue()) ? 9 : 0;
-        int telecomWeight = (((patient.hasTelecom() && patient.getTelecom().get(0).getSystem().toCode().equals("email")) 
-          ||(patient.hasTelecom() && patient.getTelecom().get(0).getUse().toCode().equals("mobile"))) 
-          && patient.getTelecom().get(0).hasValue()) ? 7 : 0;
-        int nameWeight = hasFullName ? 5 : 0;
-        int addressWeight = hasFullAddress ? 5 : 0;
-        int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
-        int maritalStatusWeight = (patient.hasMaritalStatus() && !patient.getMaritalStatus().getCoding().isEmpty()
-          && patient.getMaritalStatus().getCoding().get(0).hasCode() 
-          && patient.getMaritalStatus().getCoding().get(0).hasSystem()) ? 1 :0;
-        int genderWeight = patient.hasGender() ? 1 : 0;
-        int weight = indentifierWeight + telecomWeight + nameWeight + addressWeight + birthDateWeight
-          + maritalStatusWeight + genderWeight;
+        int weight = totalWeigh(patient);
 
-        if (profile.equals("http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1")) {
+        if (profile.equals(LEVEL1_PROFILE)) {
           validated = weight >= 6;
         } else {
           validated = weight >= 12;
@@ -219,6 +213,29 @@ public class PatientEndpoint {
       logger.severe("PatientEndpoint::ValidateMinimumRequirement: Validation failed with " + e.getMessage());
     }
     return validated;
+  }
+
+  /**
+   * Internal method to calculate the weight of the $match operation search criteria
+   * @param patient - the provided patient resource from the post query
+   * @return the total weight of the search fields
+   */
+  private int totalWeigh(Patient patient) {
+    Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
+    Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
+
+    int ppnWeight = FhirUtils.getPasportNumFromPatient(patient) != null ? 9 : 0;
+    int dlWeight = FhirUtils.getDLNumFromPatient(patient) != null ? 9 : 0;
+    int mobileWeight = FhirUtils.getPatientMobilePhone(patient) != null ? 7 : 0;
+    int emailWeight = FhirUtils.getPatientEmail(patient) != null ? 7 : 0; 
+    int nameWeight = hasFullName ? 5 : 0;
+    int addressWeight = FhirUtils.getPatientHomeAddress(patient) != null ? 5 : 0;
+    int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
+    int maritalStatusWeight = FhirUtils.getPatientMaritalStatus(patient) != null ? 1 : 0;
+    int genderWeight = patient.hasGender() ? 1 : 0;
+
+    return ppnWeight + dlWeight + mobileWeight + emailWeight + nameWeight + addressWeight + birthDateWeight
+          + maritalStatusWeight + genderWeight;
   }
 
 }

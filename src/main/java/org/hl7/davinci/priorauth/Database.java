@@ -31,8 +31,8 @@ public class Database {
   static final Logger logger = PALogger.getLogger();
 
   public enum Table {
-    BUNDLE("Bundle"), CLAIM("Claim"), CLAIM_ITEM("ClaimItem"), CLAIM_RESPONSE("ClaimResponse"),
-    SUBSCRIPTION("Subscription"), RULES("Rules"), AUDIT("Audit"), CLIENT("Client"), PATIENT("Patient");
+    BUNDLE("Bundle"), PATIENT("Patient"), CLAIM("Claim"), CLAIM_ITEM("ClaimItem"), CLAIM_RESPONSE("ClaimResponse"),
+    SUBSCRIPTION("Subscription"), RULES("Rules"), AUDIT("Audit"), CLIENT("Client");
 
     private final String value;
 
@@ -201,7 +201,7 @@ public class Database {
     String sql;
     try (Connection connection = getConnection()) {
       if (table.value().equals("Patient") && constraintMap.isEmpty()) {
-        sql = "SELECT id, patient, resource FROM " + table.value();
+        sql = "SELECT id, resource FROM " + table.value();
       } else {
         sql = "SELECT id, patient, resource FROM " + table.value() + " WHERE "
           + generateClause(constraintMap, WHERE_CONCAT) + ";";
@@ -214,9 +214,11 @@ public class Database {
       int total = 0;
       while (rs.next()) {
         String id = rs.getString("id");
-        String patientOut = rs.getString("patient");
         String json = rs.getString("resource");
-        logger.info("search: " + id + "/" + patientOut);
+        if (!table.value().equals("Patient")) {
+          String patientOut = rs.getString("patient");
+          logger.info("search: " + id + "/" + patientOut);
+        }
         Resource resource = (Resource) App.getFhirContext().newJsonParser().parseResource(json);
         resource.setId(id);
         BundleEntryComponent entry = new BundleEntryComponent();
@@ -247,8 +249,14 @@ public class Database {
     IBaseResource result = null;
     if (table != null && constraintParams != null) {
       try (Connection connection = getConnection()) {
-        String sql = "SELECT TOP 1 id, patient, resource FROM " + table.value() + " WHERE "
-            + generateClause(constraintParams, WHERE_CONCAT) + " ORDER BY timestamp DESC;";
+        String sql;
+        if (table.value().equals("Patient")) {
+          sql = "SELECT TOP 1 id, resource FROM " + table.value() + " WHERE "
+          + generateClause(constraintParams, WHERE_CONCAT) + " ORDER BY timestamp DESC;";
+        } else {
+          sql = "SELECT TOP 1 id, patient, resource FROM " + table.value() + " WHERE "
+          + generateClause(constraintParams, WHERE_CONCAT) + " ORDER BY timestamp DESC;";
+        }
         Collection<Map<String, Object>> maps = new HashSet<Map<String, Object>>();
         maps.add(constraintParams);
         PreparedStatement stmt = generateStatement(sql, maps, connection);
@@ -258,8 +266,10 @@ public class Database {
         if (rs.next()) {
           String id = rs.getString("id");
           String json = rs.getString("resource");
-          String patientOut = rs.getString("patient");
-          logger.info("read: " + id + "/" + patientOut);
+          if (!table.value().equals("Patient")) {
+            String patientOut = rs.getString("patient");
+            logger.info("read: " + id + "/" + patientOut);
+          }
           result = (Resource) App.getFhirContext().newJsonParser().parseResource(json);
         }
       } catch (SQLException e) {
@@ -285,7 +295,7 @@ public class Database {
     List<IBaseResource> results = new ArrayList<IBaseResource>();
     if (table != null && constraintParams != null) {
       try (Connection connection = getConnection()) {
-        String sql = "SELECT id, patient, resource FROM " + table.value() + " WHERE "
+        String sql = "SELECT id, resource FROM " + table.value() + " WHERE "
             + generateClause(constraintParams, WHERE_CONCAT) + " ORDER BY timestamp DESC;";
         Collection<Map<String, Object>> maps = new HashSet<Map<String, Object>>();
         maps.add(constraintParams);
@@ -296,8 +306,7 @@ public class Database {
         while (rs.next()) {
           String id = rs.getString("id");
           String json = rs.getString("resource");
-          String patientOut = rs.getString("patient");
-          logger.info("read: " + id + "/" + patientOut);
+          logger.info("read: " + id + "/");
           results.add((Resource) App.getFhirContext().newJsonParser().parseResource(json));
         }
       } catch (SQLException e) {

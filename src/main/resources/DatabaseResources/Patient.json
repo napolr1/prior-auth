@@ -20,7 +20,7 @@
         "type": {
           "coding": [ {
             "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
-            "code": "MR",
+            "code": "DL",
             "display": "Medical Record Number"
           } ],
           "text": "Medical Record Number"
@@ -41,6 +41,26 @@
         "family": "Oliver",
         "given": [ "Joanne" ]
       } ],
+      "maritalStatus" : {
+        "coding" : [
+          {
+            "system" : "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+            "code" : "M"
+          }
+        ]
+      },
+      "address" : [
+        {
+          "type" : "physical",
+          "line" : [
+            "321 South Maple Street"
+          ],
+          "city" : "Scranton",
+          "state" : "PA",
+          "postalCode" : "18503",
+          "use" : "home"
+        }
+      ],
       "gender": "female",
       "birthDate": "1946-11-01"
     }
@@ -73,7 +93,7 @@
         "type": {
           "coding": [ {
             "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
-            "code": "NIIP",
+            "code": "PPN",
             "display": "National Insurance Payor Identifier"
           } ],
           "text": "National Insurance Payor Identifier"
@@ -84,6 +104,21 @@
         "family": "Tucker",
         "given": [ "Wanda" ]
       } ],
+      "maritalStatus" : {
+        "coding" : [
+          {
+            "system" : "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+            "code" : "M"
+          }
+        ]
+      },
+      "telecom" : [
+        {
+          "system" : "phone",
+          "value" : "444-555-3939",
+          "use" : "mobile"
+        }
+      ],
       "gender": "female",
       "birthDate": "1976-12-10"
     }
@@ -101,11 +136,26 @@
           "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div class=\"hapiHeaderText\">Vlad Alan Nestor <b>QUINTON </b></div><table class=\"hapiPropertyTable\"><tbody><tr><td>Identifier</td><td>98765400001AZ</td></tr><tr><td>Date of birth</td><td><span>01 December 1956</span></td></tr></tbody></table></div>"
       },
       "identifier": [
-          {
-              "system": "http://hl7.org/fhir/sid/us-medicare",
+          {   
+            "type": {
+              "coding": [ {
+                "system": "http://hl7.org/fhir/sid/us-medicare",
+                "code": "NIIP",
+                "display": "US Medicare Payor Identifier"
+              } ],
+              "text": "US Medicare Payor Identifier"
+            },
               "value": "98765400001AZ"
           }
       ],
+      "maritalStatus" : {
+        "coding" : [
+          {
+            "system" : "http://terminology.hl7.org/CodeSystem/v3-NullFlavor",
+            "code" : "UNK"
+          }
+        ]
+      },
       "name": [
           {
               "use": "official",

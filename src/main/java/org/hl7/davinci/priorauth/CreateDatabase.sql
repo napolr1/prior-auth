@@ -20,10 +20,19 @@ BEGIN TRANSACTION;
 
     CREATE TABLE IF NOT EXISTS Patient (
         "id" varchar PRIMARY KEY,
-        "patient" varchar,
+        "ppn" varchar,
+        "dl" varchar,
+        "firstName" varchar,
+        "lastName" varchar,
+        "dob" varchar,
+        "gender" varchar,
+        "maritalStatus" varchar,
+        "address" varchar,
+        "email" nvarchar,
+        "mobile" varchar,
         "timestamp" datetime DEFAULT CURRENT_TIMESTAMP,
         "resource" clob
-      );
+    );
 
     CREATE TABLE IF NOT EXISTS ClaimResponse (
         "id" varchar PRIMARY KEY,

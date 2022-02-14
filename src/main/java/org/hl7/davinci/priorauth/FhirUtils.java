@@ -2,18 +2,23 @@ package org.hl7.davinci.priorauth;
 
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.hl7.davinci.priorauth.Database.Table;
 import org.hl7.davinci.priorauth.endpoint.Endpoint.RequestType;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.Address;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Claim;
 import org.hl7.fhir.r4.model.ClaimResponse;
 import org.hl7.fhir.r4.model.CodeType;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.ContactPoint;
+import org.hl7.fhir.r4.model.Identifier;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Reference;
@@ -26,6 +31,10 @@ import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+
+import ca.uhn.fhir.jpa.subscription.module.CanonicalSubscription.EmailDetails;
+
+import org.apache.commons.lang3.StringUtils;
 
 public class FhirUtils {
 
@@ -307,12 +316,129 @@ public class FhirUtils {
   }
 
   /**
+   * Get the Passport number identifier from patient resource
+   * @param patient - the patient resource
+   * @return the ppn value if exists, otherwise null
+   */
+  public static String getPasportNumFromPatient(Patient patient) {
+    String ppn = null;
+    if (patient.hasIdentifier()) {
+      Identifier id = patient.getIdentifier().stream().filter(identifier -> 
+        "PPN".equals(getCode(identifier.getType()))).findFirst().orElse(null);
+      ppn = id != null ? id.getValue() : null;
+    }
+    return ppn;
+  }
+
+  /**
+   * Get the Drivers license number identifier from patient resource
+   * @param patient - the patient resource
+   * @return the DL value if exists, otherwise null
+   */
+  public static String getDLNumFromPatient(Patient patient) {
+    String dl = null;
+    if (patient.hasIdentifier()) {
+      Identifier id = patient.getIdentifier().stream().filter(identifier -> 
+        "DL".equals(getCode(identifier.getType()))).findFirst().orElse(null);
+      dl = id != null ? id.getValue() : null;
+    }
+    return dl;
+  }
+
+  /**
+   * Get the patient first and last name 
+   * @param patient - the patient resource
+   * @return a hashmap containing the patient's first and last name.
+   */
+  public static Map<String, Object> getPatientFirstAndLastName(Patient patient) {
+    Map<String, Object> nameMap = new HashMap<>();
+    if (patient.hasName() && !patient.getName().isEmpty()) {
+      nameMap.put("lastName", patient.getNameFirstRep().getFamily());
+      nameMap.put("firstName", StringUtils.join(patient.getNameFirstRep().getGiven(), " "));
+    }
+
+    return nameMap;
+  }
+
+  /**
+   * Get patient marital status
+   * @param patient - the patient resource
+   * @return the marital status if provided in the resource, otherwise null.
+   */
+  public static String getPatientMaritalStatus(Patient patient) {
+    return (patient.hasMaritalStatus() && getSystem(patient.getMaritalStatus()) != null) 
+      ? getCode(patient.getMaritalStatus()) : null;
+  }
+
+  /**
+   * Get patient home address
+   * @param patient - the patient resource
+   * @return the patient home address if provided in the resource, otherwise null.
+   */
+  public static String getPatientHomeAddress(Patient patient) {
+    String address = null;
+    if(patient.hasAddress()) {
+      Address homeAddress = patient.getAddress().stream().filter(place -> {
+        if(place.hasUse())
+          return "home".equals(place.getUse().toCode());
+        return false;
+        }).findFirst().orElse(null);
+      if(homeAddress != null && homeAddress.hasLine() && homeAddress.hasCity())
+        address = StringUtils.join(homeAddress.getLine(), ", ") + ", " + homeAddress.getCity();
+    }
+    return address;
+  }
+
+  /**
+   * Get patient mobile phone
+   * @param patient - the patient resource
+   * @return the patient mobile phone if provided, otherwise null.
+   */
+  public static String getPatientMobilePhone(Patient patient) {
+    String mobile = null;
+    if (patient.hasTelecom()) {
+      ContactPoint mobileContact = patient.getTelecom().stream().filter(telecom -> {
+        if(telecom.hasUse())
+          return "mobile".equals(telecom.getUse().toCode());
+        return false;
+      }).findFirst().orElse(null);
+      if(mobileContact != null)
+        mobile = mobileContact.getValue();
+    }
+
+    return mobile;
+  }
+
+  /**
+   * Get patient email contact
+   * @param patient - the patient resource
+   * @return the patient email address if provided in the resource, otherwise null
+   */
+  public static String getPatientEmail(Patient patient) {
+    String email = null;
+    if (patient.hasTelecom()) {
+      ContactPoint emailContact = patient.getTelecom().stream().filter(telecom -> {
+        if(telecom.hasSystem())
+          return "email".equals(telecom.getSystem().toCode());
+        return false;
+      }).findFirst().orElse(null);
+      if(emailContact != null)
+        email = emailContact.getValue();
+    }
+    
+    return email;
+  }
+
+  /**
    * Get the system from the first coding
    * 
    * @param codeableConcept - the codeable concept to get the system from
    * @return the system of the first coding
    */
   public static String getSystem(CodeableConcept codeableConcept) {
+    if(codeableConcept == null)
+      return null;
+    
     return codeableConcept.getCoding().get(0).getSystem();
   }
 
@@ -323,6 +449,8 @@ public class FhirUtils {
    * @return the code of the first coding
    */
   public static String getCode(CodeableConcept codeableConcept) {
+    if(codeableConcept == null)
+      return null;
     return codeableConcept.getCoding().get(0).getCode();
   }
 

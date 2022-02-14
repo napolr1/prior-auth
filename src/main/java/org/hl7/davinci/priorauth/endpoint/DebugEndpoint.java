@@ -12,6 +12,21 @@ import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.hl7.davinci.priorauth.App;
+import org.hl7.davinci.priorauth.Audit;
+import org.hl7.davinci.priorauth.Audit.AuditEventOutcome;
+import org.hl7.davinci.priorauth.Audit.AuditEventType;
+import org.hl7.davinci.priorauth.Database.Table;
+import org.hl7.davinci.priorauth.FhirUtils;
+import org.hl7.davinci.priorauth.PALogger;
+import org.hl7.davinci.priorauth.PropertyProvider;
+import org.hl7.davinci.rules.PriorAuthRule;
+import org.hl7.davinci.ruleutils.CqlUtils;
+import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Claim;
+import org.hl7.fhir.r4.model.ClaimResponse;
+import org.hl7.fhir.r4.model.Patient;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,21 +36,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.hl7.davinci.priorauth.App;
-import org.hl7.davinci.priorauth.Audit;
-import org.hl7.davinci.priorauth.FhirUtils;
-import org.hl7.davinci.priorauth.PALogger;
-import org.hl7.davinci.priorauth.PropertyProvider;
-import org.hl7.davinci.priorauth.Audit.AuditEventOutcome;
-import org.hl7.davinci.priorauth.Audit.AuditEventType;
-import org.hl7.davinci.priorauth.Database.Table;
-import org.hl7.davinci.ruleutils.CqlUtils;
-import org.hl7.davinci.rules.PriorAuthRule;
-import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Patient;
-import org.hl7.fhir.r4.model.Claim;
-import org.hl7.fhir.r4.model.ClaimResponse;
-import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
 
 @CrossOrigin
 @RestController
@@ -43,6 +43,7 @@ import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
 public class DebugEndpoint {
 
   static final Logger logger = PALogger.getLogger();
+  private static final String DateFormat = null;
 
   @GetMapping("/Bundle")
   public ResponseEntity<String> getBundles(HttpServletRequest request) {
@@ -234,15 +235,25 @@ public class DebugEndpoint {
     for (int i = 0; i < patientBundle.getEntry().size(); i++) {
       Patient pt  = (Patient) patientBundle.getEntry().get(i).getResource();
       String id = FhirUtils.getIdFromResource(pt);
-      String patient = pt.hasIdentifier() ? pt.getIdentifierFirstRep().getValue() : null;
-      App.getDB().delete(Table.PATIENT, id, patient);
+      Map<String, Object> patientName = FhirUtils.getPatientFirstAndLastName(pt);
+
+      App.getDB().delete(Table.PATIENT, id, "");
       Map<String, Object> dataMap = new HashMap<>();
       dataMap.put("id", id);
-      dataMap.put("patient", patient);
+      dataMap.put("ppn", FhirUtils.getPasportNumFromPatient(pt));
+      dataMap.put("dl", FhirUtils.getDLNumFromPatient(pt));
+      dataMap.put("firstName", patientName.get("firstName"));
+      dataMap.put("lastName", patientName.get("lastName"));
+      dataMap.put("dob", String.format("%1$tF", pt.getBirthDate()));
+      dataMap.put("gender", pt.getGender());
+      dataMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(pt));
+      dataMap.put("address", FhirUtils.getPatientHomeAddress(pt));
+      dataMap.put("email", FhirUtils.getPatientEmail(pt));
+      dataMap.put("mobile", FhirUtils.getPatientMobilePhone(pt));
       dataMap.put("resource", pt);
-      dataMap.put("timestamp", "2200-09-10 08:43:32.9");
       status = App.getDB().write(Table.PATIENT, dataMap);
     }
+
     return status;
   }
 
