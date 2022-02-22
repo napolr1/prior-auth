@@ -94,12 +94,14 @@ public class DebugEndpoint {
   public ResponseEntity<String> populateDatabase(HttpServletRequest request) {
     if (App.isDebugModeEnabled()) {
       String description = "Populate database with test data in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request,
+          description);
       return populateDB();
     } else {
       logger.warning("DebugEndpoint::populate datatbase with test data disabeled");
       String description = "Attempted to populate database with test data but app not in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request,
+          description);
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
   }
@@ -109,12 +111,14 @@ public class DebugEndpoint {
     if (App.isDebugModeEnabled()) {
       PriorAuthRule.populateRulesTable();
       String description = "Populate database with sample rules in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request,
+          description);
       return new ResponseEntity<>(HttpStatus.OK);
     } else {
       logger.warning("DebugEndpoint::populate datatbase disabeled");
       String description = "Attempted to populate database with sample rules but app not in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request,
+          description);
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
   }
@@ -124,12 +128,14 @@ public class DebugEndpoint {
     if (App.isDebugModeEnabled()) {
       String elm = CqlUtils.cqlToElm(entity.getBody(), CqlUtils.RequestType.XML);
       String description = "Convert cql into elm in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request,
+          description);
       return ResponseEntity.status(HttpStatus.OK).body(elm);
     } else {
       logger.warning("DebugEndpoint::convert elm disabled");
       String description = "Attempted to convert cql into elm but app not in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request,
+          description);
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
   }
@@ -164,7 +170,8 @@ public class DebugEndpoint {
                 } catch (Exception e) {
                   logger.log(Level.SEVERE, "DebugEndpoint::convertAllCqlToElm", e);
                   String description = "Unable to convert " + file.getName() + " to elm";
-                  Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SERIOUS_FAILURE, null, request,
+                  Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SERIOUS_FAILURE,
+                      null, request,
                       description);
                   return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
                 }
@@ -175,12 +182,14 @@ public class DebugEndpoint {
       }
 
       String description = "Convert all CDS cql rule files to elm in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.SUCCESS, null, request,
+          description);
       return new ResponseEntity<>(HttpStatus.OK);
     } else {
       logger.warning("DebugEndpoint::convert elm disabled");
       String description = "Attempted to convert all CDS cql rule files to elm but app not in debug mode";
-      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request, description);
+      Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, AuditEventOutcome.MINOR_FAILURE, null, request,
+          description);
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
   }
@@ -233,7 +242,7 @@ public class DebugEndpoint {
   private static boolean writePatient(Bundle patientBundle) {
     boolean status = false;
     for (int i = 0; i < patientBundle.getEntry().size(); i++) {
-      Patient pt  = (Patient) patientBundle.getEntry().get(i).getResource();
+      Patient pt = (Patient) patientBundle.getEntry().get(i).getResource();
       String id = FhirUtils.getIdFromResource(pt);
       Map<String, Object> patientName = FhirUtils.getPatientFirstAndLastName(pt);
 
@@ -242,6 +251,7 @@ public class DebugEndpoint {
       dataMap.put("id", id);
       dataMap.put("ppn", FhirUtils.getPasportNumFromPatient(pt));
       dataMap.put("dl", FhirUtils.getDLNumFromPatient(pt));
+      dataMap.put("otherIdentifier", FhirUtils.getOtherIdentifierFromPatient(pt));
       dataMap.put("firstName", patientName.get("firstName"));
       dataMap.put("lastName", patientName.get("lastName"));
       dataMap.put("dob", String.format("%1$tF", pt.getBirthDate()));
@@ -249,7 +259,7 @@ public class DebugEndpoint {
       dataMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(pt));
       dataMap.put("address", FhirUtils.getPatientHomeAddress(pt));
       dataMap.put("email", FhirUtils.getPatientEmail(pt));
-      dataMap.put("mobile", FhirUtils.getPatientMobilePhone(pt));
+      dataMap.put("phone", FhirUtils.getPatientPhone(pt));
       dataMap.put("resource", pt);
       status = App.getDB().write(Table.PATIENT, dataMap);
     }
@@ -304,11 +314,13 @@ public class DebugEndpoint {
     logger.info("GET /debug/" + table.value());
     if (App.isDebugModeEnabled()) {
       String description = "Read " + table.value() + " table in debug mode.";
-      Audit.createAuditEvent(AuditEventType.QUERY, AuditEventAction.R, AuditEventOutcome.SUCCESS, null, request, description);
+      Audit.createAuditEvent(AuditEventType.QUERY, AuditEventAction.R, AuditEventOutcome.SUCCESS, null, request,
+          description);
       return new ResponseEntity<>(App.getDB().generateAndRunQuery(table), HttpStatus.OK);
     } else {
       String description = "Attempted to read " + table.value() + " table but app is not in debug mode.";
-      Audit.createAuditEvent(AuditEventType.QUERY, AuditEventAction.R, AuditEventOutcome.MINOR_FAILURE, null, request, description);
+      Audit.createAuditEvent(AuditEventType.QUERY, AuditEventAction.R, AuditEventOutcome.MINOR_FAILURE, null, request,
+          description);
       logger.warning("DebugEndpoint::query disabled");
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }

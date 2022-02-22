@@ -22,6 +22,7 @@ BEGIN TRANSACTION;
         "id" varchar PRIMARY KEY,
         "ppn" varchar,
         "dl" varchar,
+        "otherIdentifier" varchar,
         "firstName" varchar,
         "lastName" varchar,
         "dob" varchar,
@@ -29,7 +30,7 @@ BEGIN TRANSACTION;
         "maritalStatus" varchar,
         "address" varchar,
         "email" nvarchar,
-        "mobile" varchar,
+        "phone" varchar,
         "timestamp" datetime DEFAULT CURRENT_TIMESTAMP,
         "resource" clob
     );

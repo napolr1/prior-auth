@@ -317,14 +317,15 @@ public class FhirUtils {
 
   /**
    * Get the Passport number identifier from patient resource
+   * 
    * @param patient - the patient resource
    * @return the ppn value if exists, otherwise null
    */
   public static String getPasportNumFromPatient(Patient patient) {
     String ppn = null;
     if (patient.hasIdentifier()) {
-      Identifier id = patient.getIdentifier().stream().filter(identifier -> 
-        "PPN".equals(getCode(identifier.getType()))).findFirst().orElse(null);
+      Identifier id = patient.getIdentifier().stream().filter(identifier -> "PPN".equals(getCode(identifier.getType())))
+          .findFirst().orElse(null);
       ppn = id != null ? id.getValue() : null;
     }
     return ppn;
@@ -332,21 +333,41 @@ public class FhirUtils {
 
   /**
    * Get the Drivers license number identifier from patient resource
+   * 
    * @param patient - the patient resource
    * @return the DL value if exists, otherwise null
    */
   public static String getDLNumFromPatient(Patient patient) {
     String dl = null;
     if (patient.hasIdentifier()) {
-      Identifier id = patient.getIdentifier().stream().filter(identifier -> 
-        "DL".equals(getCode(identifier.getType()))).findFirst().orElse(null);
+      Identifier id = patient.getIdentifier().stream().filter(identifier -> "DL".equals(getCode(identifier.getType())))
+          .findFirst().orElse(null);
       dl = id != null ? id.getValue() : null;
     }
     return dl;
   }
 
   /**
-   * Get the patient first and last name 
+   * Get the identifier (other than pasport "PPN" or drivers license "DL") from
+   * patient resource
+   * 
+   * @param patient - the patient resource
+   * @return an identifier value other than PPN or DL if exists, otherwise null
+   */
+  public static String getOtherIdentifierFromPatient(Patient patient) {
+    String otherId = null;
+    if (patient.hasIdentifier()) {
+      Identifier id = patient.getIdentifier().stream().filter(
+          identifier -> (!"DL".equals(getCode(identifier.getType())) && !"PPN".equals(getCode(identifier.getType()))))
+          .findFirst().orElse(null);
+      otherId = id != null ? id.getValue() : null;
+    }
+    return otherId;
+  }
+
+  /**
+   * Get the patient first and last name
+   * 
    * @param patient - the patient resource
    * @return a hashmap containing the patient's first and last name.
    */
@@ -362,28 +383,31 @@ public class FhirUtils {
 
   /**
    * Get patient marital status
+   * 
    * @param patient - the patient resource
    * @return the marital status if provided in the resource, otherwise null.
    */
   public static String getPatientMaritalStatus(Patient patient) {
-    return (patient.hasMaritalStatus() && getSystem(patient.getMaritalStatus()) != null) 
-      ? getCode(patient.getMaritalStatus()) : null;
+    return (patient.hasMaritalStatus() && getSystem(patient.getMaritalStatus()) != null)
+        ? getCode(patient.getMaritalStatus())
+        : null;
   }
 
   /**
    * Get patient home address
+   * 
    * @param patient - the patient resource
    * @return the patient home address if provided in the resource, otherwise null.
    */
   public static String getPatientHomeAddress(Patient patient) {
     String address = null;
-    if(patient.hasAddress()) {
+    if (patient.hasAddress()) {
       Address homeAddress = patient.getAddress().stream().filter(place -> {
-        if(place.hasUse())
+        if (place.hasUse())
           return "home".equals(place.getUse().toCode());
         return false;
-        }).findFirst().orElse(null);
-      if(homeAddress != null && homeAddress.hasLine() && homeAddress.hasCity())
+      }).findFirst().orElse(null);
+      if (homeAddress != null && homeAddress.hasLine() && homeAddress.hasCity())
         address = StringUtils.join(homeAddress.getLine(), ", ") + ", " + homeAddress.getCity();
     }
     return address;
@@ -391,19 +415,20 @@ public class FhirUtils {
 
   /**
    * Get patient mobile phone
+   * 
    * @param patient - the patient resource
    * @return the patient mobile phone if provided, otherwise null.
    */
-  public static String getPatientMobilePhone(Patient patient) {
+  public static String getPatientPhone(Patient patient) {
     String mobile = null;
     if (patient.hasTelecom()) {
-      ContactPoint mobileContact = patient.getTelecom().stream().filter(telecom -> {
-        if(telecom.hasUse())
-          return "mobile".equals(telecom.getUse().toCode());
+      ContactPoint phoneContact = patient.getTelecom().stream().filter(telecom -> {
+        if (telecom.hasUse())
+          return "phone".equals(telecom.getSystem().toCode());
         return false;
       }).findFirst().orElse(null);
-      if(mobileContact != null)
-        mobile = mobileContact.getValue();
+      if (phoneContact != null)
+        mobile = phoneContact.getValue();
     }
 
     return mobile;
@@ -411,6 +436,7 @@ public class FhirUtils {
 
   /**
    * Get patient email contact
+   * 
    * @param patient - the patient resource
    * @return the patient email address if provided in the resource, otherwise null
    */
@@ -418,14 +444,14 @@ public class FhirUtils {
     String email = null;
     if (patient.hasTelecom()) {
       ContactPoint emailContact = patient.getTelecom().stream().filter(telecom -> {
-        if(telecom.hasSystem())
+        if (telecom.hasSystem())
           return "email".equals(telecom.getSystem().toCode());
         return false;
       }).findFirst().orElse(null);
-      if(emailContact != null)
+      if (emailContact != null)
         email = emailContact.getValue();
     }
-    
+
     return email;
   }
 
@@ -436,9 +462,9 @@ public class FhirUtils {
    * @return the system of the first coding
    */
   public static String getSystem(CodeableConcept codeableConcept) {
-    if(codeableConcept == null)
+    if (codeableConcept == null)
       return null;
-    
+
     return codeableConcept.getCoding().get(0).getSystem();
   }
 
@@ -449,7 +475,7 @@ public class FhirUtils {
    * @return the code of the first coding
    */
   public static String getCode(CodeableConcept codeableConcept) {
-    if(codeableConcept == null)
+    if (codeableConcept == null)
       return null;
     return codeableConcept.getCoding().get(0).getCode();
   }

@@ -35,13 +35,18 @@ import org.hl7.davinci.priorauth.endpoint.Endpoint.RequestType;
 
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.AuditEvent.AuditEventAction;
+import org.hl7.fhir.r4.model.Address;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.Patient;
+import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity;
 import org.hl7.fhir.r4.model.OperationOutcome.IssueType;
+import org.hl7.fhir.r4.model.Parameters.ParametersParameterComponent;
+import org.hl7.fhir.r4.model.Patient.ContactComponent;
+
 import ca.uhn.fhir.parser.IParser;
 
 /**
@@ -54,13 +59,15 @@ public class PatientEndpoint {
 
   static final Logger logger = PALogger.getLogger();
   static final String REQUIRES_PARAMETERS = "Patient matching Patient/$match Operation requires a Parameters resource containing a single Patient resource in parameter field.";
-  static final String REQUIRES_PATIENT = "Patient resource must be the first element of Parameters.parameter";
+  static final String REQUIRES_PATIENT = "Parameters.parameter must contain a single patient resource as the first element.";
   static final String REQUIRES_MIN_CRITERIA = "The request does not conform to the specification. Patient resource does not have the minimum search field";
   static final String PROCESS_FAILED = "Unable to process the request properly. Check the log for more details.";
   static final String BASE_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient";
+  static final String LEVEL0_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0";
   static final String LEVEL1_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1";
+
   // JSON output
-  @GetMapping(value = {"", "/{id}"}, produces = { MediaType.APPLICATION_JSON_VALUE, "application/fhir+json" })
+  @GetMapping(value = { "", "/{id}" }, produces = { MediaType.APPLICATION_JSON_VALUE, "application/fhir+json" })
   public ResponseEntity<String> readPatientJson(HttpServletRequest request,
       @PathVariable(required = false) String id,
       @RequestParam(name = "identifier", required = false) String patient) {
@@ -69,9 +76,9 @@ public class PatientEndpoint {
     constraintMap.put("patient", patient);
     return Endpoint.read(Table.PATIENT, constraintMap, request, RequestType.JSON);
   }
-  
+
   // XML output
-  @GetMapping(value = {"", "/{id}"}, produces = { MediaType.APPLICATION_XML_VALUE, "application/fhir+xml" })
+  @GetMapping(value = { "", "/{id}" }, produces = { MediaType.APPLICATION_XML_VALUE, "application/fhir+xml" })
   public ResponseEntity<String> readPatientXml(HttpServletRequest request,
       @PathVariable(required = false) String id,
       @RequestParam(name = "identifier", required = false) String patient) {
@@ -80,7 +87,7 @@ public class PatientEndpoint {
     constraintMap.put("patient", patient);
     return Endpoint.read(Table.PATIENT, constraintMap, request, RequestType.XML);
   }
- 
+
   @CrossOrigin
   @DeleteMapping(value = "/{id}", produces = { MediaType.APPLICATION_JSON_VALUE, "application/fhir+json" })
   public ResponseEntity<String> deleteBundle(HttpServletRequest request, @PathVariable String id,
@@ -104,8 +111,20 @@ public class PatientEndpoint {
   public ResponseEntity<String> matchOperationXml(HttpServletRequest request, HttpEntity<String> entity) {
     return matchOperation(entity.getBody(), RequestType.XML, request);
   }
-   /**
+
+  /**
    * The matchOperation ($match) function for both json and xml
+   * The Digital Identity and Patient Matching extends the HL7
+   * FHIR patient $match operation. $match works as follow
+   * 1. A trusted party makes a request to Patient/$match
+   * -- providing a set of demographic details.
+   * 2. The server checks the incoming request and first confirms it
+   * is from a trusted client by validating the access token.
+   * 3. Next the server checks the incoming Parameters resource in the
+   * request body contains a Patient resource in its parameter field and
+   * validates the patient resource against its profile (IDI-base, IDI-L1,
+   * IDI-L2).
+   * 4. Finally the server performed DB search to find possible matches.
    * 
    * @param body        - the body of the post request.
    * @param requestType - the RequestType of the request.
@@ -132,31 +151,68 @@ public class PatientEndpoint {
       // First check if the input is a Parameters resource
       if (resource instanceof Parameters) {
         Parameters parameters = (Parameters) resource;
-        // Check if the patient resource is provided in the parameter field with patient resource
-        if (parameters.hasParameter() && (!parameters.getParameter().isEmpty()) && parameters.getParameter().get(0).hasResource() 
-          && parameters.getParameter().get(0).getResource().getResourceType() == ResourceType.Patient) {
-            Patient patient = (Patient) parameters.getParameter().get(0).getResource();
+        // Check if the patient resource is provided in the parameter field of the
+        // Parameters resource
+        if (parameters.hasParameter() && (!parameters.getParameter().isEmpty())) {
+          IBaseResource patient = parameters.getParameterFirstRep().getResource();
+          if (patient instanceof Patient) {
             // Validate the minimum search criteria.
-            if (validateMinimumRequirement(patient)) {
-              // logic for match
+            if (validateMinimumRequirement((Patient) patient)) {
+              status = HttpStatus.ACCEPTED;
+              // TODO: once the minimum requirement is validated, define the strategy to
+              // identify possible match and scoring.
+              /**
+               * compare the given patient resouce fields to each pt resource from the DB
+               * Possible logic:
+               * select patient resource with at least 2 matching fields??
+               * * possible fuzzy match on each field (name, address, DOB, etc)???
+               * scoring: weight on each field ??
+               * 
+               * * * Possible Queries:
+               * -- SELECT resource FROM Patient WHERE ppn like || dl like || otherIdentifier
+               * like
+               * -- SELECT resource FROM Patient WHERE firstName like ... AND lastName like
+               * ...
+               * -- SELECT resource FROM Patient WHERE firstName like ... AND lastName like
+               * ... AND dob like
+               * -- SELECT resource FROM Patient WHERE firstName like ... AND lastName like
+               * ... AND address like ...
+               * -- SELECT resource FROM Patient WHERE firstName like ... AND lastNAME like
+               * ... AND phone like ...
+               * -- SELECT resource FROM Patient WHERE firstName sounds like ... AND lastName
+               * sounds like ..
+               * -- SELECT resource FROM Patient WHERE firstName sounds like ... AND lastName
+               * sounds like .. AND dob like
+               * -- SELECT resource FROM Patient WHERE firstName sounds like ... AND lastName
+               * sounds like .. AND phone like
+               * -- SELECT resource FROM Patient WHERE firstName sounds like ... AND lastName
+               * sounds like .. AND address like
+               * 
+               * * Determine the percent match for each query and take the avg for the final
+               * score???
+               */
             } else {
-              OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.INVALID, REQUIRES_MIN_CRITERIA);
+              OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.INVALID,
+                  REQUIRES_MIN_CRITERIA);
               formattedData = FhirUtils.getFormattedData(error, requestType);
-              logger.severe("PatientEndpoint::ValidateMinimumRequirement:First Patient does not have the minimum required field");
+              logger.severe(
+                  "PatientEndpoint::ValidateMinimumRequirement: Patient does not have the minimum required fields");
             }
-            // TODO: once the minimum requirement is validated, define the strategy to identify possible match and scoring
-            /**
-             * compare the given patient resouce fields to each pt resource from the DB
-             * Possible logic:
-             * select patient resource with at least 2 matching fields??
-             * * possible fuzzy match on each field (name, address, DOB, etc)???
-             * scoring: weight on each field ??
-             */
+
+          } else {
+            // Patient is required...
+            OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.INVALID, REQUIRES_PATIENT);
+            formattedData = FhirUtils.getFormattedData(error, requestType);
+            logger.severe(
+                "PatientEndpoint::MatchOperation: Parameters parameter must contain a Patient resource as the first element");
+          }
+
         } else {
-          // Patient is required...
-          OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.INVALID, REQUIRES_PATIENT);
+          // Parameters resource must have a parameter field...
+          OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.INVALID,
+              "Missing Parameters.parmeter");
           formattedData = FhirUtils.getFormattedData(error, requestType);
-          logger.severe("PatientEndpoint::MatchOperation:First Parameters parameter is not a Patient");
+          logger.severe("PatientEndpoint::MatchOperation: Parameters parameter field is missing");
         }
       } else {
         // Input should be a Parameters resource...
@@ -170,7 +226,8 @@ public class PatientEndpoint {
       formattedData = FhirUtils.getFormattedData(error, requestType);
       auditOutcome = AuditEventOutcome.SERIOUS_FAILURE;
     }
-    Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, auditOutcome, null, request, "POST /Patient/$match");
+    Audit.createAuditEvent(AuditEventType.REST, AuditEventAction.E, auditOutcome, null, request,
+        "POST /Patient/$match");
     MediaType contentType = requestType == RequestType.JSON ? MediaType.APPLICATION_JSON : MediaType.APPLICATION_XML;
     String fhirContentType = requestType == RequestType.JSON ? "application/fhir+json" : "application/xml+json";
     return ResponseEntity.status(status).contentType(contentType)
@@ -181,33 +238,78 @@ public class PatientEndpoint {
   }
 
   /**
-   * Validates the patient resource provided in the Patient/$match request meet the minimum
-   * requirement of the profile it claims to be conformant to.
+   * Validates the patient resource provided in the Patient/$match request meet
+   * the minimum requirement of the profile it claims to be conformant to.
+   * * Requirements for Base Level:
+   * -- Patient path: identifier.exists() or telecom.exists() or
+   * (name.family.exists() and name.given.exists())
+   * or (address.line.exists() and address.city.exists()) or birthDate.exists()
+   * -- Patient.contact path: name.exists() or telecom.exists() or
+   * address.exists() or organization.exists()
    * 
-   * @param patient - the patient resource contained in the Parameters resource provided in the post request.
+   * * Requirements for Level 0 weighted:
+   * -- Patient Path: (((identifier.type.coding.exists(code = 'PPN') and
+   * identifier.value.exists()).toInteger()*10)
+   * + ((identifier.type.coding.exists(code = 'DL') and
+   * identifier.value.exists()).toInteger()*10)
+   * + (((address.exists(use = 'home') and address.line.exists() and
+   * address.city.exists())
+   * or (identifier.type.coding.exists(code != 'PPN' and code != 'DL'))
+   * or ((telecom.exists(system = 'email') and telecom.value.exists())
+   * or (telecom.exists(system = 'phone') and telecom.value.exists())) or
+   * (photo.exists())).toInteger() * 4)
+   * + ((name.family.exists() and name.given.exists()).toInteger()*4) +
+   * (birthDate.exists().toInteger()*2)) >= 10
+   * 
+   * -- Patient.contact path: name.exists() or telecom.exists() or
+   * address.exists() or organization.exists()
+   * 
+   * * Requirements for Level 1 weighted:
+   * -- Patient Path: (((identifier.type.coding.exists(code = 'PPN') and
+   * identifier.value.exists()).toInteger()*10)
+   * + ((identifier.type.coding.exists(code = 'DL') and
+   * identifier.value.exists()).toInteger()*10)
+   * + (((address.exists(use = 'home') and address.line.exists() and
+   * address.city.exists())
+   * or (identifier.type.coding.exists(code != 'PPN' and code != 'DL'))
+   * or ((telecom.exists(system = 'email') and telecom.value.exists())
+   * or (telecom.exists(system = 'phone') and telecom.value.exists())) or
+   * (photo.exists())).toInteger() * 4)
+   * + ((name.family.exists() and name.given.exists()).toInteger()*4) +
+   * (birthDate.exists().toInteger()*2)) >= 20
+   * 
+   * -- Patient.contact path: name.exists() or telecom.exists() or
+   * address.exists() or organization.exists()
+   * 
+   * @param patient - the patient resource contained in the Parameters resource
+   *                provided in the post request.
    * @return - true if constraints are validated, false otherwise
    */
   private boolean validateMinimumRequirement(Patient patient) {
+    // The server will validate parameters against the base profile by default.
     String profile = BASE_PROFILE;
-    if(patient.hasMeta() && patient.getMeta().hasProfile() && !patient.getMeta().getProfile().isEmpty())
+    if (patient.hasMeta() && patient.getMeta().hasProfile() && !patient.getMeta().getProfile().isEmpty())
       profile = patient.getMeta().getProfile().get(0).getValue();
+    Address patientAddress = patient.hasAddress() && !patient.getAddress().isEmpty()
+        ? patient.getAddress().stream().filter(address -> (address.hasLine() && address.hasCity())).findFirst()
+            .orElse(null)
+        : null;
     Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
     Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
-    Boolean hasHomeAddress = FhirUtils.getPatientHomeAddress(patient) != null;
+    ContactComponent patientContact = patient.hasContact() ? patient.getContactFirstRep() : null;
+    Boolean hasContact = patientContact != null && (patientContact.hasName() || patientContact.hasTelecom()
+        || patientContact.hasAddress() || patientContact.hasOrganization());
     Boolean validated = false;
+    int weight = totalWeigh(patient);
     try {
-      if (profile.equals(BASE_PROFILE)) {
-        // Base level constraints
-        validated = patient.hasIdentifier() || patient.hasTelecom() || hasFullName ||hasHomeAddress || patient.hasBirthDate();
+      if (profile.equals(LEVEL0_PROFILE)) {
+        validated = hasContact && weight >= 10;
+      } else if (profile.equals(LEVEL1_PROFILE)) {
+        validated = hasContact && weight >= 20;
       } else {
-        int weight = totalWeigh(patient);
-
-        if (profile.equals(LEVEL1_PROFILE)) {
-          validated = weight >= 6;
-        } else {
-          validated = weight >= 12;
-        }
-  
+        // Base level constraints
+        validated = hasContact && (patient.hasIdentifier() || patient.hasTelecom() || hasFullName
+            || patientAddress != null || patient.hasBirthDate());
       }
     } catch (Exception e) {
       logger.severe("PatientEndpoint::ValidateMinimumRequirement: Validation failed with " + e.getMessage());
@@ -216,7 +318,9 @@ public class PatientEndpoint {
   }
 
   /**
-   * Internal method to calculate the weight of the $match operation search criteria
+   * Internal method to calculate the weight of the $match operation search
+   * criteria
+   * 
    * @param patient - the provided patient resource from the post query
    * @return the total weight of the search fields
    */
@@ -224,19 +328,16 @@ public class PatientEndpoint {
     Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
     Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
 
-    int ppnWeight = FhirUtils.getPasportNumFromPatient(patient) != null ? 9 : 0;
-    int dlWeight = FhirUtils.getDLNumFromPatient(patient) != null ? 9 : 0;
-    int mobileWeight = FhirUtils.getPatientMobilePhone(patient) != null ? 7 : 0;
-    int emailWeight = FhirUtils.getPatientEmail(patient) != null ? 7 : 0; 
-    int nameWeight = hasFullName ? 5 : 0;
-    int addressWeight = FhirUtils.getPatientHomeAddress(patient) != null ? 5 : 0;
+    int ppnWeight = FhirUtils.getPasportNumFromPatient(patient) != null ? 10 : 0;
+    int dlWeight = FhirUtils.getDLNumFromPatient(patient) != null ? 10 : 0;
+    int addressOrTelOrOtherIdWeight = (FhirUtils.getPatientHomeAddress(patient) != null
+        || FhirUtils.getOtherIdentifierFromPatient(patient) != null
+        || FhirUtils.getPatientPhone(patient) != null || FhirUtils.getPatientEmail(patient) != null
+        || patient.hasPhoto()) ? 4 : 0;
+    int nameWeight = hasFullName ? 4 : 0;
     int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
-    int maritalStatusWeight = FhirUtils.getPatientMaritalStatus(patient) != null ? 1 : 0;
-    int genderWeight = patient.hasGender() ? 1 : 0;
 
-    return ppnWeight + dlWeight + mobileWeight + emailWeight + nameWeight + addressWeight + birthDateWeight
-          + maritalStatusWeight + genderWeight;
+    return ppnWeight + dlWeight + addressOrTelOrOtherIdWeight + nameWeight + birthDateWeight;
   }
 
 }
-
