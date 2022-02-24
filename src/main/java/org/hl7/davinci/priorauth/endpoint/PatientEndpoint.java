@@ -58,9 +58,13 @@ import ca.uhn.fhir.parser.IParser;
 public class PatientEndpoint {
 
   static final Logger logger = PALogger.getLogger();
-  static final String REQUIRES_PARAMETERS = "Patient matching Patient/$match Operation requires a Parameters resource containing a single Patient resource in parameter field.";
+  static final String REQUIRES_PARAMETERS = "Patient matching Patient/$match Operation requires a Parameters resource containing"
+      + " a single Patient resource in parameter field.";
   static final String REQUIRES_PATIENT = "Parameters.parameter must contain a single patient resource as the first element.";
-  static final String REQUIRES_MIN_CRITERIA = "The request does not conform to the specification. Patient resource does not have the minimum search field";
+  static final String REQUIRES_MIN_CRITERIA = "The Patient resource provided is not conformant to profile: %s as claimed. "
+      + "Please check the profile's constraints and ensure the minimum search fields are provided.";
+  static final String MISSING_OR_INVALID_PROFILE = "Patient's profile is missing or not defined in the IG."
+      + " Please provide the IDI profile the patient resource conforms to.";
   static final String PROCESS_FAILED = "Unable to process the request properly. Check the log for more details.";
   static final String BASE_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient";
   static final String LEVEL0_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0";
@@ -154,13 +158,18 @@ public class PatientEndpoint {
         // Check if the patient resource is provided in the parameter field of the
         // Parameters resource
         if (parameters.hasParameter() && (!parameters.getParameter().isEmpty())) {
-          IBaseResource patient = parameters.getParameterFirstRep().getResource();
-          if (patient instanceof Patient) {
+
+          if (parameters.getParameterFirstRep().getResource() instanceof Patient) {
+            Patient patient = (Patient) parameters.getParameterFirstRep().getResource();
+
             // Validate the minimum search criteria.
-            if (validateMinimumRequirement((Patient) patient)) {
+            Map<String, String> validation = validateMinimumRequirement(patient);
+            if (Boolean.parseBoolean(validation.get("validated"))) {
               status = HttpStatus.ACCEPTED;
               // TODO: once the minimum requirement is validated, define the strategy to
               // identify possible match and scoring.
+              // TODO: assign the result of the match query to the `formattedData` variable,
+              // which is returned at the end of the method.
               /**
                * compare the given patient resouce fields to each pt resource from the DB
                * Possible logic:
@@ -193,10 +202,10 @@ public class PatientEndpoint {
                */
             } else {
               OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.ERROR, IssueType.INVALID,
-                  REQUIRES_MIN_CRITERIA);
+                  validation.get("error"));
               formattedData = FhirUtils.getFormattedData(error, requestType);
               logger.severe(
-                  "PatientEndpoint::ValidateMinimumRequirement: Patient does not have the minimum required fields");
+                  "PatientEndpoint::ValidateMinimumRequirement: Patient resource provided is not conformant to profile as claimed.");
             }
 
           } else {
@@ -222,7 +231,8 @@ public class PatientEndpoint {
       }
     } catch (Exception e) {
       // Spectacular faillure of the match request
-      OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.FATAL, IssueType.STRUCTURE, e.getMessage());
+      OperationOutcome error = FhirUtils.buildOutcome(IssueSeverity.FATAL, IssueType.STRUCTURE,
+          e.getMessage());
       formattedData = FhirUtils.getFormattedData(error, requestType);
       auditOutcome = AuditEventOutcome.SERIOUS_FAILURE;
     }
@@ -283,13 +293,22 @@ public class PatientEndpoint {
    * 
    * @param patient - the patient resource contained in the Parameters resource
    *                provided in the post request.
-   * @return - true if constraints are validated, false otherwise
+   * @return - a hashMap containing a String form of boolean value in the
+   *         `validated` key
+   *         indicating whether the constrains are validated,
+   *         and a String value in the `error` key describing the reason for
+   *         invalidating.
    */
-  private boolean validateMinimumRequirement(Patient patient) {
-    // The server will validate parameters against the base profile by default.
-    String profile = BASE_PROFILE;
-    if (patient.hasMeta() && patient.getMeta().hasProfile() && !patient.getMeta().getProfile().isEmpty())
-      profile = patient.getMeta().getProfile().get(0).getValue();
+  private Map<String, String> validateMinimumRequirement(Patient patient) {
+    Boolean validated = false;
+    Map<String, String> validationMap = new HashMap<>();
+    String profile = FhirUtils.getProfileMetaFromPatient(patient);
+    if (profile == null || !profile.matches(BASE_PROFILE + "|" + LEVEL0_PROFILE + "|" + LEVEL1_PROFILE)) {
+      validationMap.put("validated", String.valueOf(validated));
+      validationMap.put("error", MISSING_OR_INVALID_PROFILE);
+      return validationMap;
+    }
+
     Address patientAddress = patient.hasAddress() && !patient.getAddress().isEmpty()
         ? patient.getAddress().stream().filter(address -> (address.hasLine() && address.hasCity())).findFirst()
             .orElse(null)
@@ -299,22 +318,19 @@ public class PatientEndpoint {
     ContactComponent patientContact = patient.hasContact() ? patient.getContactFirstRep() : null;
     Boolean hasContact = patientContact != null && (patientContact.hasName() || patientContact.hasTelecom()
         || patientContact.hasAddress() || patientContact.hasOrganization());
-    Boolean validated = false;
     int weight = totalWeigh(patient);
-    try {
-      if (profile.equals(LEVEL0_PROFILE)) {
-        validated = hasContact && weight >= 10;
-      } else if (profile.equals(LEVEL1_PROFILE)) {
-        validated = hasContact && weight >= 20;
-      } else {
-        // Base level constraints
-        validated = hasContact && (patient.hasIdentifier() || patient.hasTelecom() || hasFullName
-            || patientAddress != null || patient.hasBirthDate());
-      }
-    } catch (Exception e) {
-      logger.severe("PatientEndpoint::ValidateMinimumRequirement: Validation failed with " + e.getMessage());
+    if (profile.equals(LEVEL0_PROFILE)) {
+      validated = hasContact && weight >= 10;
+    } else if (profile.equals(LEVEL1_PROFILE)) {
+      validated = hasContact && weight >= 20;
+    } else {
+      validated = hasContact && (patient.hasIdentifier() || patient.hasTelecom() || hasFullName
+          || patientAddress != null || patient.hasBirthDate());
     }
-    return validated;
+    String error = validated ? "" : String.format(REQUIRES_MIN_CRITERIA, profile);
+    validationMap.put("validated", String.valueOf(validated));
+    validationMap.put("error", error);
+    return validationMap;
   }
 
   /**

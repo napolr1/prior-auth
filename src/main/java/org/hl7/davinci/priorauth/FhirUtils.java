@@ -352,7 +352,7 @@ public class FhirUtils {
    * patient resource
    * 
    * @param patient - the patient resource
-   * @return an identifier value other than PPN or DL if exists, otherwise null
+   * @return an identifier value other than PPN or DL if exists, otherwise null.
    */
   public static String getOtherIdentifierFromPatient(Patient patient) {
     String otherId = null;
@@ -363,6 +363,19 @@ public class FhirUtils {
       otherId = id != null ? id.getValue() : null;
     }
     return otherId;
+  }
+
+  /**
+   * Get the meta profile from the patient resource.
+   * 
+   * @param patient - the patient resource
+   * @return the patient resource profile if given, otherwise null.
+   */
+  public static String getProfileMetaFromPatient(Patient patient) {
+    String profile = null;
+    if (patient.hasMeta() && patient.getMeta().hasProfile() && !patient.getMeta().getProfile().isEmpty())
+      profile = patient.getMeta().getProfile().get(0).getValue();
+    return profile;
   }
 
   /**
