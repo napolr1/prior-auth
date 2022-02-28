@@ -89,7 +89,7 @@ public class DatabaseTest {
 
   @Test
   public void testReadAll() {
-    List<IBaseResource> results = App.getDB().readAll(Table.BUNDLE, Collections.singletonMap("patient", "pat013"));
+    List<IBaseResource> results = App.getDB().readAll(Table.BUNDLE, Collections.singletonMap("patient", "pat013"), " AND ");
     Assert.assertNotNull(results);
     Assert.assertEquals(2, results.size());
 
@@ -171,7 +171,7 @@ public class DatabaseTest {
     Assert.assertTrue(outcome);
 
     // Validate all items deleted
-    List<IBaseResource> bundleTable = App.getDB().readAll(Table.BUNDLE, Collections.singletonMap("patient", "pat013"));
+    List<IBaseResource> bundleTable = App.getDB().readAll(Table.BUNDLE, Collections.singletonMap("patient", "pat013"), " AND ");
     Assert.assertEquals(0, bundleTable.size());
   }
 

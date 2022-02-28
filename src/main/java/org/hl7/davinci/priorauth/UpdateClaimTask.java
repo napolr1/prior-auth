@@ -70,7 +70,7 @@ public class UpdateClaimTask extends TimerTask {
             Map<String, Object> constraintMap = new HashMap<>();
             constraintMap.put("claimResponseId", claimId);
             constraintMap.put("patient", patient);
-            List<IBaseResource> subscriptions = App.getDB().readAll(Table.SUBSCRIPTION, constraintMap);
+            List<IBaseResource> subscriptions = App.getDB().readAll(Table.SUBSCRIPTION, constraintMap, " AND ");
 
             // Send notification to each subscriber
             subscriptions.stream().forEach(resource -> {

@@ -286,17 +286,18 @@ public class Database {
    * 
    * @param table            - the Table to read from.
    * @param constraintParams - the search constraints for the SQL query.
+   * @param concatValue - the String used to concatenate different fields, " AND " for AND and " OR " for OR.
    * @return List of IBaseResource for all resources matching the constraints.
    *         Empty list if none
    */
-  public List<IBaseResource> readAll(Table table, Map<String, Object> constraintParams) {
+  public List<IBaseResource> readAll(Table table, Map<String, Object> constraintParams, String concatValue) {
     logger.info("Database::readAll(" + table.value() + ", " + constraintParams.toString() + ")");
     AuditEventOutcome auditOutcome = AuditEventOutcome.SUCCESS;
     List<IBaseResource> results = new ArrayList<IBaseResource>();
     if (table != null && constraintParams != null) {
       try (Connection connection = getConnection()) {
         String sql = "SELECT id, resource FROM " + table.value() + " WHERE "
-            + generateClause(constraintParams, WHERE_CONCAT) + " ORDER BY timestamp DESC;";
+            + generateClause(constraintParams, concatValue) + " ORDER BY timestamp DESC;";
         Collection<Map<String, Object>> maps = new HashSet<Map<String, Object>>();
         maps.add(constraintParams);
         PreparedStatement stmt = generateStatement(sql, maps, connection);
