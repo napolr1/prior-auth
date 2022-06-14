@@ -139,9 +139,9 @@ public class PatientEndpoint {
     App.setBaseUrl(Endpoint.getServiceBaseUrl(request));
 
     // TODO: check it is conforming to UDAP workflow
-    if (!AuthUtils.validateAccessToken(request))
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
-          .body("{ error: \"Invalid access token. Make sure to use Authorization: Bearer (token)\" }");
+    //if (!AuthUtils.validateAccessToken(request))
+     // return ResponseEntity.status(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
+     //     .body("{ error: \"Invalid access token. Make sure to use Authorization: Bearer (token)\" }");
 
     HttpStatus status = HttpStatus.BAD_REQUEST;
     String formattedData = null;
