@@ -1,10 +1,6 @@
 package org.hl7.davinci.priorauth.endpoint;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Timer;
-import java.util.UUID;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -69,13 +65,22 @@ public class PatientEndpoint {
   static final String BASE_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient";
   static final String LEVEL0_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0";
   static final String LEVEL1_PROFILE = "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1";
+  static final List<String> sortableParams = Arrays.asList("id", "firstname", "lastname");
 
   // JSON output
   @GetMapping(value = { "", "/{id}" }, produces = { MediaType.APPLICATION_JSON_VALUE, "application/fhir+json" })
   public ResponseEntity<String> readPatientJson(HttpServletRequest request,
       @PathVariable(required = false) String id,
-      @RequestParam(name = "identifier", required = false) String patient) {
+      @RequestParam(name = "identifier", required = false) String patient,
+      @RequestParam(name = "sortParam", required = false) String sortParam) {
     Map<String, Object> constraintMap = new HashMap<>();
+    logger.info("SortParam="+sortParam);
+    if (sortParam != null) {
+      if (!sortableParams.contains(sortParam)) {
+        return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+      }
+    constraintMap.put("sortParam", sortParam);
+    }
     constraintMap.put("id", id);
     constraintMap.put("patient", patient);
     return Endpoint.read(Table.PATIENT, constraintMap, request, RequestType.JSON);
@@ -85,8 +90,18 @@ public class PatientEndpoint {
   @GetMapping(value = { "", "/{id}" }, produces = { MediaType.APPLICATION_XML_VALUE, "application/fhir+xml" })
   public ResponseEntity<String> readPatientXml(HttpServletRequest request,
       @PathVariable(required = false) String id,
-      @RequestParam(name = "identifier", required = false) String patient) {
+      @RequestParam(name = "identifier", required = false) String patient,
+      @RequestParam(name = "sortParam", required = false) String sortParam) {
     Map<String, Object> constraintMap = new HashMap<>();
+    if (sortParam != null) {
+      if (!sortableParams.contains(sortParam)) {
+        String error = "The sortParam parameter must be one of: " + sortableParams.toString();
+        logger.info(error);
+        logger.fine(error);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+      }
+    constraintMap.put("sortParam", sortParam);
+    }
     constraintMap.put("id", id);
     constraintMap.put("patient", patient);
     return Endpoint.read(Table.PATIENT, constraintMap, request, RequestType.XML);
@@ -140,8 +155,8 @@ public class PatientEndpoint {
 
     // TODO: check it is conforming to UDAP workflow
     //if (!AuthUtils.validateAccessToken(request))
-     // return ResponseEntity.status(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
-     //     .body("{ error: \"Invalid access token. Make sure to use Authorization: Bearer (token)\" }");
+    //  return ResponseEntity.status(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
+    //      .body("{ error: \"Invalid access token. Make sure to use Authorization: Bearer (token)\" }");
 
     HttpStatus status = HttpStatus.BAD_REQUEST;
     String formattedData = null;
@@ -162,10 +177,72 @@ public class PatientEndpoint {
           if (parameters.getParameterFirstRep().getResource() instanceof Patient) {
             Patient patient = (Patient) parameters.getParameterFirstRep().getResource();
 
-            // Validate the minimum search criteria.
+            // Validate the minimum search criteria. 
             Map<String, String> validation = validateMinimumRequirement(patient);
+            
+            logger.info("after call - minimumRequirementMet="+validation.get("validated"));
             if (Boolean.parseBoolean(validation.get("validated"))) {
               status = HttpStatus.ACCEPTED;
+              logger.info("got here");
+              status = HttpStatus.OK;
+              formattedData = "{ \"resourceType\": \"Bundle\", \"id\": \"" + UUID.randomUUID().toString() + "\", ";
+              formattedData = formattedData + "\"type\": \"searchset\", \"total\":";
+              //String query = "SELECT * FROM Patient ORDER BY TIMESTAMP DESC";
+              //String queryResult = App.getDB().runQuery(query, false, false);
+              //logger.info("******** QueryResult 1= "+queryResult);
+              Map<String, Object> constraintMap = new HashMap<>();
+              Patient new_patient = (Patient) patient;
+              //Patient new_patient = (Patient) patientBundle.getEntry().get(i).getResource()
+              // Uses same logic as debugEndpoint populating to remove any 
+              Map<String, Object> patientName = FhirUtils.getPatientFirstAndLastName(new_patient);
+             
+              constraintMap.put("id", FhirUtils.getIdFromResource(new_patient)); 
+              constraintMap.put("ppn", FhirUtils.getPasportNumFromPatient(new_patient));
+              constraintMap.put("dl", FhirUtils.getDLNumFromPatient(new_patient));
+              constraintMap.put("otherIdentifier", FhirUtils.getOtherIdentifierFromPatient(new_patient));
+              constraintMap.put("firstName", patientName.get("firstName"));
+              constraintMap.put("lastName", patientName.get("lastName"));
+              constraintMap.put("dob", String.format("%1$tF", new_patient.getBirthDate()));
+              logger.info("patient gender="+new_patient.getGender());
+              /*constraintMap.put("gender", new_patient.getGender());
+              constraintMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(new_patient));
+              constraintMap.put("address", FhirUtils.getPatientHomeAddress(new_patient));
+              constraintMap.put("city", FhirUtils.getPatientHomeCity(new_patient));
+              constraintMap.put("state", FhirUtils.getPatientHomeState(new_patient));
+              constraintMap.put("email", FhirUtils.getPatientEmail(new_patient));
+              constraintMap.put("phone", FhirUtils.getPatientPhone(new_patient));
+              */
+              //constraintMap.put("resource", new_patient);
+
+              //remove empty constraints
+              while (constraintMap.values().remove(null));
+             
+              logger.info("****constraintMap="+constraintMap);
+            
+              List<IBaseResource> matchCandidates = App.getDB().readAll(Table.PATIENT, constraintMap, " OR " );
+              logger.info("matchCandidates="+matchCandidates);
+              List<IBaseResource> matches = new ArrayList<IBaseResource>();
+              logger.info("Number of matchCandidates="+matchCandidates.size());
+              for (int i=0; i<matchCandidates.size(); i++) { 
+                //logger.info("match Candidate: " + (Patient) matchCandidates.get(i));
+                int candidateWeight = calculateWeight((Patient) matchCandidates.get(i), constraintMap);
+                //if (candidateWeight >= 10) {
+                  matches.add(matchCandidates.get(i));
+                //}
+                logger.info("candidate weight: " + candidateWeight); 
+              }
+              String url[]=request.getRequestURI().split("$");
+              String patientLink=url[0]+FhirUtils.getIdFromResource(new_patient);
+
+              formattedData = formattedData + matches.size() + ",\"link\":" + patientLink + ",\"entry\": [";
+              for (int i=0; i<matches.size(); i++) {
+              if ( i==0 ) {
+                formattedData = formattedData + FhirUtils.getFormattedData(matches.get(i), requestType);
+              } else {
+                formattedData = formattedData + ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
+              }
+                    }
+                    formattedData = formattedData + "]}";
               // TODO: once the minimum requirement is validated, define the strategy to
               // identify possible match and scoring.
               // TODO: assign the result of the match query to the `formattedData` variable,
@@ -303,33 +380,50 @@ public class PatientEndpoint {
     Boolean validated = false;
     Map<String, String> validationMap = new HashMap<>();
     String profile = FhirUtils.getProfileMetaFromPatient(patient);
-    if (profile == null || !profile.matches(BASE_PROFILE + "|" + LEVEL0_PROFILE + "|" + LEVEL1_PROFILE)) {
+   /*if (profile == null || !profile.matches(BASE_PROFILE + "|" + LEVEL0_PROFILE + "|" + LEVEL1_PROFILE)) {
       validationMap.put("validated", String.valueOf(validated));
       validationMap.put("error", MISSING_OR_INVALID_PROFILE);
       return validationMap;
     }
-
+    */
     Address patientAddress = patient.hasAddress() && !patient.getAddress().isEmpty()
         ? patient.getAddress().stream().filter(address -> (address.hasLine() && address.hasCity())).findFirst()
             .orElse(null)
         : null;
+
     Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
     Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
     ContactComponent patientContact = patient.hasContact() ? patient.getContactFirstRep() : null;
-    Boolean hasContact = patientContact != null && (patientContact.hasName() || patientContact.hasTelecom()
+    Boolean hasContact = patientContact != null && (patientContact.hasName() && patientContact.hasTelecom()
         || patientContact.hasAddress() || patientContact.hasOrganization());
+ 
+    boolean   minimumRequirementMet=false;
+    if  (   (  (( (fullName.get("firstName") != null)    &&  (fullName.get("lastName") != null)) || patient.hasBirthDate()) && patient.hasIdentifier())  ||
+            (  (fullName.get("firstName")   != null)     &&  (fullName.get("lastName") != null)  && patient.hasBirthDate()  && !patient.getAddress().isEmpty()  && patient.getGender()!=null )  ||
+            (  (fullName.get("firstName")   != null)     &&  (fullName.get("lastName") != null)  && patient.hasBirthDate()  &&  (patient.getAddress().stream().filter(address -> (address.hasLine() && address.hasCity())).findFirst() !=null )  ) ||
+            (  (fullName.get("firstName")   != null)     &&  (fullName.get("lastName") != null)  && patient.hasBirthDate()  && patient.hasTelecom()  )        ) 
+          {
+
+            minimumRequirementMet=true;
+          }else
+          {   minimumRequirementMet=false;
+          }
+    logger.info("****minMatchRequirementsMet="+minimumRequirementMet);
     int weight = totalWeigh(patient);
-    if (profile.equals(LEVEL0_PROFILE)) {
+    /*if (profile.equals(LEVEL0_PROFILE)) {
       validated = hasContact && weight >= 10;
     } else if (profile.equals(LEVEL1_PROFILE)) {
       validated = hasContact && weight >= 20;
     } else {
       validated = hasContact && (patient.hasIdentifier() || patient.hasTelecom() || hasFullName
           || patientAddress != null || patient.hasBirthDate());
-    }
-    String error = validated ? "" : String.format(REQUIRES_MIN_CRITERIA, profile);
-    validationMap.put("validated", String.valueOf(validated));
+    }*/
+
+   // String error = validated ? "" : String.format(REQUIRES_MIN_CRITERIA, profile);
+    String error = minimumRequirementMet ? "" : String.format(REQUIRES_MIN_CRITERIA, profile);
+    validationMap.put("validated", String.valueOf(minimumRequirementMet));
     validationMap.put("error", error);
+    logger.info("error="+error);
     return validationMap;
   }
 
@@ -354,6 +448,111 @@ public class PatientEndpoint {
     int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
 
     return ppnWeight + dlWeight + addressOrTelOrOtherIdWeight + nameWeight + birthDateWeight;
+  }
+
+  private int calculateWeight(Patient patient, Map<String, Object> constraintMap) {
+    Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
+    Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
+    String constraintPPN = (String) constraintMap.getOrDefault("ppn", "0");
+    logger.info("constraintPPN: " + constraintPPN);
+    int ppnWeight = 0;
+    if (constraintPPN != "0" && FhirUtils.getPasportNumFromPatient(patient) != null) {
+      logger.info(FhirUtils.getPasportNumFromPatient(patient));
+      ppnWeight = FhirUtils.getPasportNumFromPatient(patient).equals(constraintPPN) ? 10 : -10;
+    }
+    logger.info("ppnWeight: " + ppnWeight);
+    String constraintDL = (String) constraintMap.getOrDefault("dl", "0");
+    logger.info("constraintDL: " + constraintDL);
+    int dlWeight = 0;
+    if (constraintDL != "0" && FhirUtils.getDLNumFromPatient(patient) != null) {
+      logger.info(FhirUtils.getDLNumFromPatient(patient));
+      dlWeight = FhirUtils.getDLNumFromPatient(patient).equals(constraintDL) ? 10 : -10;
+    }
+    logger.info("dlWeight: " + dlWeight);
+    Boolean constraintHasFullName = ((String) constraintMap.getOrDefault("firstName", "NONE") != "NONE") && ((String) constraintMap.getOrDefault("lastName", "NONE") != "NONE");
+    int fullNameWeight = 0;
+    if (constraintHasFullName && hasFullName) {
+      String constraintFullName = (String) constraintMap.get("firstName") + " " + (String) constraintMap.get("lastName");
+      fullNameWeight = hasFullName && ((fullName.get("firstName") + " " + fullName.get("lastName")).equals(constraintFullName)) ? 4: -4;
+    }
+    logger.info("fullNameWeight: " + fullNameWeight);
+    // String constraintDOB = (String) constraintMap.getOrDefault("dob", "0");
+    // int dobWeight = 0;
+    // if (constraintDOB != "0" && patient.getBirthDate() != null) {
+    //   dobWeight = patient.getBirthDate()
+    // }
+    // int addressOrTelOrOtherIdWeight = (FhirUtils.getPatientHomeAddress(patient) != null
+    //     || FhirUtils.getOtherIdentifierFromPatient(patient) != null
+    //     || FhirUtils.getPatientPhone(patient) != null || FhirUtils.getPatientEmail(patient) != null
+    //     || patient.hasPhoto()) ? 4 : 0;
+    // int nameWeight = hasFullName ? 4 : 0;
+    // int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
+    logger.info("weight: " + (ppnWeight + dlWeight + fullNameWeight));
+    return ppnWeight + dlWeight + fullNameWeight;
+  }
+  private int calculateScore(Patient patient, Map<String, Object> constraintMap) {
+
+    /*
+    constraintMap.put("id", FhirUtils.getIdFromResource(new_patient)); 
+    constraintMap.put("ppn", FhirUtils.getPasportNumFromPatient(new_patient));
+    constraintMap.put("dl", FhirUtils.getDLNumFromPatient(new_patient));
+    constraintMap.put("otherIdentifier", FhirUtils.getOtherIdentifierFromPatient(new_patient));
+    constraintMap.put("firstName", patientName.get("firstName"));
+    constraintMap.put("lastName", patientName.get("lastName"));
+    constraintMap.put("dob", String.format("%1$tF", new_patient.getBirthDate()));
+    logger.info("patient gender="+new_patient.getGender());
+    constraintMap.put("gender", new_patient.getGender());
+    constraintMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(new_patient));
+    constraintMap.put("address", FhirUtils.getPatientHomeAddress(new_patient));
+    constraintMap.put("city", FhirUtils.getPatientHomeCity(new_patient));
+    constraintMap.put("state", FhirUtils.getPatientHomeState(new_patient));
+    constraintMap.put("email", FhirUtils.getPatientEmail(new_patient));
+    constraintMap.put("phone", FhirUtils.getPatientPhone(new_patient));
+    */
+    Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
+    
+    Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
+    String constraintPPN = (String) constraintMap.getOrDefault("ppn", "0");
+    logger.info("constraintPPN: " + constraintPPN);
+      int ppnWeight = 0; 
+     
+    if ( constraintMap.get("id")==constraintMap.get("id") ||
+         hasFullName && constraintMap.get("dl")==constraintMap.get("dl") &&
+        
+
+    if (constraintPPN != "0" && FhirUtils.getPasportNumFromPatient(patient) != null) {
+      logger.info(FhirUtils.getPasportNumFromPatient(patient));
+      ppnWeight = FhirUtils.getPasportNumFromPatient(patient).equals(constraintPPN) ? 10 : -10;
+    }
+    logger.info("ppnWeight: " + ppnWeight);
+    String constraintDL = (String) constraintMap.getOrDefault("dl", "0");
+    logger.info("constraintDL: " + constraintDL);
+    int dlWeight = 0;
+    if (constraintDL != "0" && FhirUtils.getDLNumFromPatient(patient) != null) {
+      logger.info(FhirUtils.getDLNumFromPatient(patient));
+      dlWeight = FhirUtils.getDLNumFromPatient(patient).equals(constraintDL) ? 10 : -10;
+    }
+    logger.info("dlWeight: " + dlWeight);
+    Boolean constraintHasFullName = ((String) constraintMap.getOrDefault("firstName", "NONE") != "NONE") && ((String) constraintMap.getOrDefault("lastName", "NONE") != "NONE");
+    int fullNameWeight = 0;
+    if (constraintHasFullName && hasFullName) {
+      String constraintFullName = (String) constraintMap.get("firstName") + " " + (String) constraintMap.get("lastName");
+      fullNameWeight = hasFullName && ((fullName.get("firstName") + " " + fullName.get("lastName")).equals(constraintFullName)) ? 4: -4;
+    }
+    logger.info("fullNameWeight: " + fullNameWeight);
+    // String constraintDOB = (String) constraintMap.getOrDefault("dob", "0");
+    // int dobWeight = 0;
+    // if (constraintDOB != "0" && patient.getBirthDate() != null) {
+    //   dobWeight = patient.getBirthDate()
+    // }
+    // int addressOrTelOrOtherIdWeight = (FhirUtils.getPatientHomeAddress(patient) != null
+    //     || FhirUtils.getOtherIdentifierFromPatient(patient) != null
+    //     || FhirUtils.getPatientPhone(patient) != null || FhirUtils.getPatientEmail(patient) != null
+    //     || patient.hasPhoto()) ? 4 : 0;
+    // int nameWeight = hasFullName ? 4 : 0;
+    // int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
+    logger.info("weight: " + (ppnWeight + dlWeight + fullNameWeight));
+    return ppnWeight + dlWeight + fullNameWeight;
   }
 
 }

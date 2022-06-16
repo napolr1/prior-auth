@@ -393,7 +393,34 @@ public class FhirUtils {
 
     return nameMap;
   }
+  /**
+   * Get the patient first name
+   * 
+   * @param patient - the patient resource
+   * @return a hashmap containing the patient's first  .
+   */ 
+  public static Map<String, Object> getPatientFirstName(Patient patient) {
+    Map<String, Object> nameMap = new HashMap<>();
+    if (patient.hasName() && !patient.getName().isEmpty()) {       
+      nameMap.put("firstName", StringUtils.join(patient.getNameFirstRep().getGiven(), ""));
+    }
 
+    return nameMap;
+  }
+   /**
+   * Get the patient   last name
+   * 
+   * @param patient - the patient resource
+   * @return a hashmap containing the patient's last name.
+   */ 
+  public static Map<String, Object> getPatientLastName(Patient patient) {
+    Map<String, Object> nameMap = new HashMap<>();
+    if (patient.hasName() && !patient.getName().isEmpty()) {       
+      nameMap.put("lastName", patient.getNameFirstRep().getFamily());
+    }
+
+    return nameMap;
+  }
   /**
    * Get patient marital status
    * 
@@ -420,12 +447,51 @@ public class FhirUtils {
           return "home".equals(place.getUse().toCode());
         return false;
       }).findFirst().orElse(null);
-      if (homeAddress != null && homeAddress.hasLine() && homeAddress.hasCity())
-        address = StringUtils.join(homeAddress.getLine(), ", ") + ", " + homeAddress.getCity();
+      if (homeAddress != null && homeAddress.hasLine() && homeAddress.hasCity()){
+       //address = homeAddress.getLine().toString() ;
+       address = StringUtils.join(homeAddress.getLine(), "")  ;
+      }
+       // address = StringUtils.join(homeAddress.getLine(), ", ") + ", " + homeAddress.getCity();
     }
     return address;
   }
-
+  /**
+   * Get patient home address
+   * 
+   * @param patient - the patient resource
+   * @return the patient home address if provided in the resource, otherwise null.
+   */
+  public static String getPatientHomeCity(Patient patient) {
+    String city = null;
+    if (patient.hasAddress()) {
+      Address homeAddress = patient.getAddress().stream().filter(place -> {
+       if (place.hasUse())
+          return "home".equals(place.getUse().toCode());
+        return false;
+      }).findFirst().orElse(null);
+      
+      if ( homeAddress.hasCity()){
+        city = homeAddress.getCity(); 
+      }
+      logger.info("in getPatientHomeCity - city="+city);
+       // address = StringUtils.join(homeAddress.getLine(), ", ") + ", " + homeAddress.getCity();
+    }
+    return city;
+  }
+  public static String getPatientHomeState(Patient patient) {
+    String homeState = null;
+    if (patient.hasAddress()) {
+      Address homeAddress = patient.getAddress().stream().filter(place -> {
+        if (place.hasUse())
+          return "home".equals(place.getUse().toCode());
+        return false;
+      }).findFirst().orElse(null);
+      if ( homeAddress.hasState()){
+        homeState = homeAddress.getState(); 
+      } 
+    }
+    return homeState;
+  }
   /**
    * Get patient mobile phone
    * 
