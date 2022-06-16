@@ -207,7 +207,7 @@ public class PatientEndpoint {
               constraintMap.put("lastName", patientName.get("lastName"));
               constraintMap.put("dob", String.format("%1$tF", new_patient.getBirthDate()));
               logger.info("patient gender="+new_patient.getGender());
-              /constraintMap.put("gender", new_patient.getGender());
+              constraintMap.put("gender", new_patient.getGender());
               constraintMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(new_patient));
               constraintMap.put("address", FhirUtils.getPatientHomeAddress(new_patient));
               constraintMap.put("city", FhirUtils.getPatientHomeCity(new_patient));
@@ -225,28 +225,38 @@ public class PatientEndpoint {
               List<IBaseResource> matchCandidates = App.getDB().readAll(Table.PATIENT, constraintMap, " OR " );
               logger.info("matchCandidates="+matchCandidates);
               List<IBaseResource> matches = new ArrayList<IBaseResource>();
+              
               logger.info("Number of matchCandidates="+matchCandidates.size());
+              int numberOfMatches=0;
               for (int i=0; i<matchCandidates.size(); i++) { 
                 //logger.info("match Candidate: " + (Patient) matchCandidates.get(i));
                 int candidateWeight = calculateWeight((Patient) matchCandidates.get(i), constraintMap);
                 //if (candidateWeight >= 10) {
                   matches.add(matchCandidates.get(i));
+                  numberOfMatches++;
                 //}
                 logger.info("candidate weight: " + candidateWeight); 
-              }
+                logger.info("numberOfMatches: " + numberOfMatches); 
+              } 
+
               String url[]=request.getRequestURI().split("$");
-              String patientLink=url[0]+FhirUtils.getIdFromResource(new_patient);
-              if (matches.size() > 0  ) {}
-                formattedData = formattedData + matches.size() + ",\"link\":" + patientLink + ",\"entry\": [";
-            }
-              for (int i=0; i<matches.size(); i++) {
-              if ( i==0 ) {
-                formattedData = formattedData + FhirUtils.getFormattedData(matches.get(i), requestType);
-              } else {
-                formattedData = formattedData + ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
-              }
+              formattedData += numberOfMatches ; 
+              if (  matches.size() > 0) {
+                  String patientLink=url[0]+FhirUtils.getIdFromResource(new_patient);
+
+                  formattedData +=   ",\"link\":" + patientLink + ",\"entry\": [";           
+
+                  for (int i=0; i<matches.size(); i++) {
+                      if ( i==0 ) {
+                        formattedData += FhirUtils.getFormattedData(matches.get(i), requestType);
+                      } else {
+                        formattedData +=  ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
+                      }
                     }
-                    formattedData = formattedData + "]}";
+                  formattedData = formattedData + "]}";
+                } else {
+                    formattedData = formattedData + "}";
+                }
               // TODO: once the minimum requirement is validated, define the strategy to
               // identify possible match and scoring.
               // TODO: assign the result of the match query to the `formattedData` variable,
