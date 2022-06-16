@@ -138,7 +138,7 @@ public class ExpungeOperation {
         constraintMap.put("status", status);
         Date today = new Date();
         Subscription sub;
-        List<IBaseResource> subscriptions = App.getDB().readAll(Table.SUBSCRIPTION, constraintMap);
+        List<IBaseResource> subscriptions = App.getDB().readAll(Table.SUBSCRIPTION, constraintMap, " AND ");
         if (subscriptions != null) {
 
             while (subscriptions.iterator().hasNext()) {

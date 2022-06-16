@@ -157,7 +157,7 @@ public class ClaimInquiryEndpoint {
         Identifier claimInquiryIdentifier = claimInquiry.getIdentifier().get(0);
 
         // Search DB for all claims for patient then filter to where identifiers match
-        List<IBaseResource> claims = App.getDB().readAll(Table.CLAIM, Collections.singletonMap("patient", patient));
+        List<IBaseResource> claims = App.getDB().readAll(Table.CLAIM, Collections.singletonMap("patient", patient), " AND ");
         logger.fine("Found " + claims.size() + " claims for Patient " + patient + " (Inquiry bundle: "
                 + requestBundle.getId() + ")");
         for (IBaseResource resource : claims) {
