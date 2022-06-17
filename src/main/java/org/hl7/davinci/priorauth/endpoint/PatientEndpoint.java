@@ -75,6 +75,7 @@ public class PatientEndpoint {
       @RequestParam(name = "sortParam", required = false) String sortParam) {
     Map<String, Object> constraintMap = new HashMap<>();
     logger.info("SortParam="+sortParam);
+    logger.info("id="+id);
     if (sortParam != null) {
       if (!sortableParams.contains(sortParam)) {
         return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
@@ -82,7 +83,7 @@ public class PatientEndpoint {
     constraintMap.put("sortParam", sortParam);
     }
     constraintMap.put("id", id);
-    constraintMap.put("patient", patient);
+    //constraintMap.put("patient", patient);
     return Endpoint.read(Table.PATIENT, constraintMap, request, RequestType.JSON);
   }
 
@@ -228,9 +229,11 @@ public class PatientEndpoint {
               
               logger.info("Number of matchCandidates="+matchCandidates.size());
               int numberOfMatches=0;
+            
               for (int i=0; i<matchCandidates.size(); i++) { 
                 //logger.info("match Candidate: " + (Patient) matchCandidates.get(i));
                 int candidateWeight = calculateWeight((Patient) matchCandidates.get(i), constraintMap);
+                
                 //if (candidateWeight >= 10) {
                   matches.add(matchCandidates.get(i));
                   numberOfMatches++;
@@ -239,19 +242,29 @@ public class PatientEndpoint {
                 logger.info("numberOfMatches: " + numberOfMatches); 
               } 
 
-              String url[]=request.getRequestURI().split("$");
+              
               formattedData += numberOfMatches ; 
-              if (  matches.size() > 0) {
-                  String patientLink=url[0]+FhirUtils.getIdFromResource(new_patient);
-
-                  formattedData +=   ",\"link\":" + patientLink + ",\"entry\": [";           
+              if (  numberOfMatches > 0) {
+                  String requestURL=request.getRequestURL().toString(); 
+                  String tmp[]=requestURL.split("$");
+                  logger.info("tmp[0]="+tmp[0]);
+                   
+                  formattedData +=   ",\"entry\": [";           
 
                   for (int i=0; i<matches.size(); i++) {
-                      if ( i==0 ) {
+                   // matchCandidates.get(i)
+                  
+                      //String patientID=FhirUtils.getOtherIdentifierFromPatient( (Patient) matchCandidates.get(i)); 
+                      String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i));
+                      logger.info("patientID="+patientID);
+                      String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\"";
+                      logger.info("patientLink="+patientLink);
+                      //if ( i==0 ) {
+                        formattedData+= "\"total\":" + numberOfMatches + ",\r\n\"link\"  : [{ \"relation\": \"self\", \"url\": "  + patientLink + "\r\n}\r\n],";
                         formattedData += FhirUtils.getFormattedData(matches.get(i), requestType);
-                      } else {
-                        formattedData +=  ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
-                      }
+                      //} else {
+                      //  formattedData +=  ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
+                      // }
                     }
                   formattedData = formattedData + "]}";
                 } else {
@@ -450,6 +463,7 @@ public class PatientEndpoint {
    */
   private int totalWeigh(Patient patient) {
     Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
+    
     Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
 
     int ppnWeight = FhirUtils.getPasportNumFromPatient(patient) != null ? 10 : 0;
