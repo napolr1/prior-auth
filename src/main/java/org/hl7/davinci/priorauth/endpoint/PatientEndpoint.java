@@ -267,7 +267,7 @@ public class PatientEndpoint {
                         formattedData +=",\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType) ;
                        }
                     }
-                  formattedData = formattedData + "}";
+                  formattedData = formattedData + "}]}";
                 } else {
                     formattedData = formattedData + "}";
                 }
