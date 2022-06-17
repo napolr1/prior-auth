@@ -261,6 +261,7 @@ public class PatientEndpoint {
                       logger.info("patientID="+patientID);
                       String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\""; 
                       logger.info("patientLink="+patientLink);
+                      formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
                       if ( i==0 ) {
                         //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
                         formattedData += "\r\n\"resource\": \r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
