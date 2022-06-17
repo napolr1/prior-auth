@@ -1,0 +1,17 @@
+version: '3.4'
+
+services:
+  Api:
+    image: onc-certification_inferno
+    container_name: onc-certification_inferno
+    build:
+      context: .
+      dockerfile: /mnt/c/projects/fhirprojects/connectithon/prior-auth
+    ports:
+      - "0.0.0.0:8082:8081"
+    networks:
+      - my-network
+  
+networks:
+  my-network:
+    external: true
