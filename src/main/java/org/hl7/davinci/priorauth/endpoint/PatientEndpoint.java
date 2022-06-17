@@ -73,7 +73,7 @@ public class PatientEndpoint {
       @PathVariable(required = false) String id,
       @RequestParam(name = "identifier", required = false) String patient,
       @RequestParam(name = "sortParam", required = false) String sortParam,
-      @RequestParam(name = "count", required = false) String requestRecordCount),
+      @RequestParam(name = "count", required = false) String requestRecordCount,
       @RequestParam(name = "onlyCertainMatches", required = false) String onlyCertainMatches) {
     Map<String, Object> constraintMap = new HashMap<>();
     logger.info("SortParam="+sortParam);
