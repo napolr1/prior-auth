@@ -257,10 +257,10 @@ public class PatientEndpoint {
                       //String patientID=FhirUtils.getOtherIdentifierFromPatient( (Patient) matchCandidates.get(i)); 
                       String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i));
                       logger.info("patientID="+patientID);
-                      String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\"";
+                      String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\""; 
                       logger.info("patientLink="+patientLink);
                       //if ( i==0 ) {
-                        formattedData+= "\"total\":" + numberOfMatches + ",\r\n\"link\"  : [{ \"relation\": \"self\", \"url\": "  + patientLink + "\r\n}\r\n],";
+                        formattedData+= ",\r\n\"link\"  : [{ \"relation\": \"self\", \"url\": "  + patientLink + "\r\n}\r\n],";
                         formattedData += FhirUtils.getFormattedData(matches.get(i), requestType);
                       //} else {
                       //  formattedData +=  ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
