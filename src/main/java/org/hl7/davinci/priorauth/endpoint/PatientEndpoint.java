@@ -249,7 +249,7 @@ public class PatientEndpoint {
                   String tmp[]=requestURL.split("$");
                   logger.info("tmp[0]="+tmp[0]);
                    
-                  formattedData +=   ",\"entry\": [";           
+                  formattedData +=   ",\"entry\": [{";           
 
                   for (int i=0; i<matches.size(); i++) {
                    // matchCandidates.get(i)
@@ -260,10 +260,11 @@ public class PatientEndpoint {
                       String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\""; 
                       logger.info("patientLink="+patientLink);
                       if ( i==0 ) {
-                        formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
-                        formattedData += FhirUtils.getFormattedData(matches.get(i), requestType);
+                        //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
+                        formattedData += ",\r\n\"resource\": {\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType)+"}";
                       } else {
-                        formattedData +=  ",\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
+                       
+                        formattedData +=",\r\n\"resource\": {\r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType) +" }";
                        }
                     }
                   formattedData = formattedData + "}";
