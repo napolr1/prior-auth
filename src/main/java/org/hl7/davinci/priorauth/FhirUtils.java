@@ -347,6 +347,7 @@ public class FhirUtils {
     return dl;
   }
 
+
   /**
    * Get the identifier (other than pasport "PPN" or drivers license "DL") from
    * patient resource
