@@ -261,10 +261,10 @@ public class PatientEndpoint {
                       logger.info("patientLink="+patientLink);
                       if ( i==0 ) {
                         //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
-                        formattedData += ",\r\n\"resource\": {\r\n" + FhirUtils.getFormattedData(matches.get(i), requestType)+"}";
+                        formattedData += "\r\n\"resource\": \r\n" + FhirUtils.getFormattedData(matches.get(i), requestType);
                       } else {
                        
-                        formattedData +=",\r\n\"resource\": {\r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType) +" }";
+                        formattedData +=",\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType) ;
                        }
                     }
                   formattedData = formattedData + "}";
