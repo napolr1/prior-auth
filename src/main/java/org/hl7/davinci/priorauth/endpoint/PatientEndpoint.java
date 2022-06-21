@@ -601,6 +601,6 @@ public class PatientEndpoint {
     }
         
     return patientLinkList
-  }
+  }*/
 }
  
