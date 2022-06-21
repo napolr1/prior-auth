@@ -523,7 +523,7 @@ public class PatientEndpoint {
     logger.info("weight: " + (ppnWeight + dlWeight + fullNameWeight));
     return ppnWeight + dlWeight + fullNameWeight;
   }
-
+/*  
   private int calculateScore(Patient patient, Map<String, Object> constraintMap) {
     Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
     Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
@@ -600,5 +600,7 @@ public class PatientEndpoint {
         patientLinkList.add(patientLink);
     }
         
-return patientLinkList
+    return patientLinkList
+  }
 }
+ 
