@@ -210,8 +210,8 @@ public class PatientEndpoint {
               constraintMap.put("lastName", patientName.get("lastName"));
               constraintMap.put("dob", String.format("%1$tF", new_patient.getBirthDate()));
               logger.info("patient gender="+new_patient.getGender());
-              constraintMap.put("gender", new_patient.getGender());
-              constraintMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(new_patient));
+              //constraintMap.put("gender", new_patient.getGender());
+              //constraintMap.put("maritalStatus", FhirUtils.getPatientMaritalStatus(new_patient));
               constraintMap.put("address", FhirUtils.getPatientHomeAddress(new_patient));
               constraintMap.put("city", FhirUtils.getPatientHomeCity(new_patient));
               constraintMap.put("state", FhirUtils.getPatientHomeState(new_patient));
@@ -260,14 +260,15 @@ public class PatientEndpoint {
                       String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i));
                       logger.info("patientID="+patientID);
                       String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\""; 
-                      logger.info("patientLink="+patientLink);
+                      String patientLinks[]=getPatientLinks((Patient) matches.get(i));
+                      //logger.info("patientLink="+patientLink);
                       //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
                       if ( i==0 ) {
                         //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
                         formattedData += "\r\n\"resource\": \r\n" + FhirUtils.getFormattedData(matches.get(i), requestType)+ "}";
                       } else {
                        
-                        formattedData +=",\r\n{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "}" ;
+                        formattedData +=",\r\n{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "\r\n\"link\":"+ patientLinks+"\r\n}" ;
                        }
                         
                     }
@@ -584,7 +585,7 @@ public class PatientEndpoint {
     logger.info("weight: " + (ppnWeight + dlWeight + fullNameWeight));
     return ppnWeight + dlWeight + fullNameWeight;
   }
-
+*/
   private String[] getPatientLinks(Patient patients) {
 
     String requestURL=request.getRequestURL().toString(); 
@@ -601,6 +602,68 @@ public class PatientEndpoint {
     }
         
     return patientLinkList
-  }*/
+  } 
+  /*  
+  private int calculateScore(Patient patient) {
+    Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
+    Boolean hasFullName = (fullName.get("firstName") != null) && (fullName.get("lastName") != null);
+    String constraintPPN = (String) constraintMap.getOrDefault("ppn", "0");
+    logger.info("constraintPPN: " + constraintPPN);
+    int ppnWeight = 0;
+
+
+    String patientID=FhirUtils.getIdFromResource(patient);
+    String passportNum= FhirUtils.getPasportNumFromPatient(patient);  
+    String DLNum=FhirUtils.getDLNumFromPatient(patient));
+
+    String otherIdentifier = FhirUtils.getOtherIdentifierFromPatient(patient));
+    String firstName = patientName.get("firstName");
+    String lastName =  patientName.get("lastName");
+    String dob=String.format("%1$tF", patient.getBirthDate());
+    String  gender=  patient.getGender(); 
+    String maritalStatus = FhirUtils.getPatientMaritalStatus(patient);
+    String address= FhirUtils.getPatientHomeAddress(patient);
+    String patientAddrCity= FhirUtils.getPatientHomeCity(patient);
+    String patientAddrState = FhirUtils.getPatientHomeState(patient);
+    String email= FhirUtils.getPatientEmail(patient);
+    String phone = FhirUtils.getPatientPhone(patient) ;
+
+    if (  (constraintMap.get("id") == patientID) ||
+          (constraintMap.get("firstName)") == firstName  &&  constraintMap.get("lastName") == lastName  && constraintMap.get("lastName") == lastName)
+    if (constraintPPN != "0" && FhirUtils.getPasportNumFromPatient(patient) != null) {
+      logger.info(FhirUtils.getPasportNumFromPatient(patient));
+      ppnWeight = FhirUtils.getPasportNumFromPatient(patient).equals(constraintPPN) ? 10 : -10;
+    }
+    logger.info("ppnWeight: " + ppnWeight);
+    String constraintDL = (String) constraintMap.getOrDefault("dl", "0");
+    logger.info("constraintDL: " + constraintDL);
+    int dlWeight = 0;
+    if (constraintDL != "0" && FhirUtils.getDLNumFromPatient(patient) != null) {
+      logger.info(FhirUtils.getDLNumFromPatient(patient));
+      dlWeight = FhirUtils.getDLNumFromPatient(patient).equals(constraintDL) ? 10 : -10;
+    }
+    logger.info("dlWeight: " + dlWeight);
+    Boolean constraintHasFullName = ((String) constraintMap.getOrDefault("firstName", "NONE") != "NONE") && ((String) constraintMap.getOrDefault("lastName", "NONE") != "NONE");
+    int fullNameWeight = 0;
+    if (constraintHasFullName && hasFullName) {
+      String constraintFullName = (String) constraintMap.get("firstName") + " " + (String) constraintMap.get("lastName");
+      fullNameWeight = hasFullName && ((fullName.get("firstName") + " " + fullName.get("lastName")).equals(constraintFullName)) ? 4: -4;
+    }
+    logger.info("fullNameWeight: " + fullNameWeight);
+    // String constraintDOB = (String) constraintMap.getOrDefault("dob", "0");
+    // int dobWeight = 0;
+    // if (constraintDOB != "0" && patient.getBirthDate() != null) {
+    //   dobWeight = patient.getBirthDate()
+    // }
+    // int addressOrTelOrOtherIdWeight = (FhirUtils.getPatientHomeAddress(patient) != null
+    //     || FhirUtils.getOtherIdentifierFromPatient(patient) != null
+    //     || FhirUtils.getPatientPhone(patient) != null || FhirUtils.getPatientEmail(patient) != null
+    //     || patient.hasPhoto()) ? 4 : 0;
+    // int nameWeight = hasFullName ? 4 : 0;
+    // int birthDateWeight = patient.hasBirthDate() ? 2 : 0;
+    logger.info("weight: " + (ppnWeight + dlWeight + fullNameWeight));
+    return ppnWeight + dlWeight + fullNameWeight;
+  }
+  */
 }
  
