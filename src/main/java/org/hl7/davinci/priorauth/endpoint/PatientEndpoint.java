@@ -251,7 +251,7 @@ public class PatientEndpoint {
                   String tmp[]=requestURL.split("$");
                   logger.info("tmp[0]="+tmp[0]);
                    
-                  formattedData +=   ",\"entry\": [{";        
+                  formattedData +=   ",\"entry\": [";        
                   String[] patientLinkList = new String[numberOfMatches];
                   for (int i=0; i<numberOfMatches; i++) { 
                     
