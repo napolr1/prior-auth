@@ -251,7 +251,15 @@ public class PatientEndpoint {
                   String tmp[]=requestURL.split("$");
                   logger.info("tmp[0]="+tmp[0]);
                    
-                  formattedData +=   ",\"entry\": [{";           
+                  formattedData +=   ",\"entry\": [{";        
+                  String[] patientLinkList = new String[numberOfMatches];
+                  for (int i=0; i<numberOfMatches; i++) { 
+                    
+                       String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i)); 
+                       String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID ; 
+                       patientLinkList[i]=patientLink;
+                  }
+                        
 
                   for (int i=0; i<matches.size(); i++) {
                    // matchCandidates.get(i)
@@ -260,18 +268,15 @@ public class PatientEndpoint {
                       String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i));
                       logger.info("patientID="+patientID);
                       String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\""; 
-                      String patientLinks[]=getPatientLinks((Patient) matches.get(i));
+                       
                       //logger.info("patientLink="+patientLink);
                       //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
-                      if ( i==0 ) {
-                        //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
-                        formattedData += "\r\n\"resource\": \r\n" + FhirUtils.getFormattedData(matches.get(i), requestType)+ "}";
-                      } else {
-                       
-                        formattedData +=",\r\n{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "\r\n\"link\":"+ patientLinks+"\r\n}" ;
-                       }
+                      if ( i > 0 ) {                        
+                        formattedData +=",\r\n" ;
+                      }
+                      formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "\r\n\"link\": [\r\n"+ patientLinkList+"\r\n]\r\n}" ;
                         
-                    }
+                  }
                   formattedData = formattedData + "]}";
                 } else {
                     formattedData = formattedData + "}";
@@ -586,23 +591,7 @@ public class PatientEndpoint {
     return ppnWeight + dlWeight + fullNameWeight;
   }
 */
-  private String[] getPatientLinks(Patient patients) {
-
-    String requestURL=request.getRequestURL().toString(); 
-    String tmp[]=requestURL.split("$");
-  
-    logger.info("tmp[0]="+tmp[0]);
-                
-    String patientLinkList[];
-    Strinkg patientLink=tmp[0];
-    for (int i=0; i<patients.size(); i++) {
-        String patientID=FhirUtils.getOtherIdentifierFromPatient( (Patient) patients.get(i)); 
-        patientLink+=patientID;
-        patientLinkList.add(patientLink);
-    }
-        
-    return patientLinkList
-  } 
+ 
   /*  
   private int calculateScore(Patient patient) {
     Map<String, Object> fullName = FhirUtils.getPatientFirstAndLastName(patient);
