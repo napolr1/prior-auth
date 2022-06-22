@@ -274,8 +274,9 @@ public class PatientEndpoint {
                       if ( i > 0 ) {                        
                         formattedData +=",\r\n" ;
                       }
-                      formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "\r\n\"link\": [\r\n"+ patientLinkList+"\r\n]\r\n}" ;
-                        
+                      //formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "\r\n\"link\": [\r\n"+ patientLinkList+"\r\n]\r\n}" ;
+                      formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+"\r\n}" ;
+  
                   }
                   formattedData = formattedData + "]}";
                 } else {
