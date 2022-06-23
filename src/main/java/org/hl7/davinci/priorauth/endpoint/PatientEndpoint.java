@@ -260,12 +260,12 @@ public class PatientEndpoint {
                   for (int i=0; i<numberOfMatches; i++) { 
                     
                        String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i)); 
-                       if ( i > 0 ) {
-                           patientLink+=",";
-                       }
+                       
                        String patientURL=tmp[0].replaceAll("\\$match", "") + patientID;
-                       patientLink = "{\"relation\": \"self\", \"url\":\""+ patientURL +"\"\r\n}" ; 
-                       //patientLinkList[i]=patientLink;
+                       if ( i > 0 ) {
+                        patientLinkList+=",";
+                       }
+                       patientLink = "{\"relation\": \"self\", \"url\":\""+ patientURL +"\"\r\n}" ;  
                        patientLinkList += patientLink;
 
                   }
