@@ -264,7 +264,7 @@ public class PatientEndpoint {
                            patientLink+=",";
                        }
                        String patientURL=tmp[0].replaceAll("\\$match", "") + patientID;
-                       patientLink = "{\"relation\": \"self\", \"url\":\r\n"+ patientURL +"\r\n}" ; 
+                       patientLink = "{\"relation\": \"self\", \"url\":\""+ patientURL +"\"\r\n}" ; 
                        //patientLinkList[i]=patientLink;
                        patientLinkList += patientLink;
 
