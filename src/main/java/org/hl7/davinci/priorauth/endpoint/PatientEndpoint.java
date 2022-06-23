@@ -263,7 +263,8 @@ public class PatientEndpoint {
                        if ( i > 0 ) {
                            patientLink+=",";
                        }
-                       patientLink = "{\r\n"+ tmp[0].replaceAll("\\$match", "") + patientID +"\r\n}" ; 
+                       String patientURL=tmp[0].replaceAll("\\$match", "") + patientID;
+                       patientLink = "{\"relation\": \"self\", \"url\":\r\n"+ patientURL +"\r\n}" ; 
                        //patientLinkList[i]=patientLink;
                        patientLinkList += patientLink;
 
