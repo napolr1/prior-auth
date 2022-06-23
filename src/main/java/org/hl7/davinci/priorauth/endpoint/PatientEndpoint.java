@@ -251,31 +251,41 @@ public class PatientEndpoint {
                   String tmp[]=requestURL.split("$");
                   logger.info("tmp[0]="+tmp[0]);
                    
-                  formattedData +=   ",\"entry\": [";        
-                  String[] patientLinkList = new String[numberOfMatches];
+                  formattedData +=   ",\"entry\": [";      
+                  
+                  //Build Patient.Link array
+                  //String patientLinkList = new String[numberOfMatches];
+                  String patientLinkList="\"link\":[";
+                  String patientLink;
                   for (int i=0; i<numberOfMatches; i++) { 
                     
                        String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i)); 
-                       String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID ; 
-                       patientLinkList[i]=patientLink;
-                  }
-                        
+                       if ( i > 0 ) {
+                           patientLink+=",";
+                       }
+                       patientLink = "{\r\n"+ tmp[0].replaceAll("\\$match", "") + patientID +"\r\n}" ; 
+                       //patientLinkList[i]=patientLink;
+                       patientLinkList += patientLink;
 
+                  }
+                  patientLinkList+="]";
+                  // Build Patient Resource Element
                   for (int i=0; i<matches.size(); i++) {
                    // matchCandidates.get(i)
                   
                       //String patientID=FhirUtils.getOtherIdentifierFromPatient( (Patient) matchCandidates.get(i)); 
                       String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i));
                       logger.info("patientID="+patientID);
-                      String patientLink = "\"" + tmp[0].replaceAll("\\$match", "") + patientID + "\""; 
-                       
-                      //logger.info("patientLink="+patientLink);
-                      //formattedData+= "\r\n\"fullUrl\"  : "+ patientLink + ",\r\n\"resource\":";
+                      
+                      
                       if ( i > 0 ) {                        
                         formattedData +=",\r\n" ;
                       }
-                      //formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+ "\r\n\"link\": [\r\n"+ patientLinkList+"\r\n]\r\n}" ;
-                      formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+"\r\n}" ;
+ 
+                      String resourceJson=FhirUtils.getFormattedData(matches.get(i), requestType);
+                      //formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+"\r\n }" ;
+
+                      formattedData +="{\r\n\"resource\": \r\n" + resourceJson+"\r\n"+  +patientLinkList+ "\r\n }" ;
   
                   }
                   formattedData = formattedData + "]}";
