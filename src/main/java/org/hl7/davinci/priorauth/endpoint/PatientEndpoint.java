@@ -256,7 +256,7 @@ public class PatientEndpoint {
                   //Build Patient.Link array
                   //String patientLinkList = new String[numberOfMatches];
                   String patientLinkList="\"link\":[";
-                  String patientLink;
+                  String patientLink="";
                   for (int i=0; i<numberOfMatches; i++) { 
                     
                        String patientID=FhirUtils.getIdFromResource((Patient) matches.get(i)); 
@@ -268,7 +268,7 @@ public class PatientEndpoint {
                        patientLinkList += patientLink;
 
                   }
-                  patientLinkList+="]";
+                  patientLinkList = patientLinkList + "]";
                   // Build Patient Resource Element
                   for (int i=0; i<matches.size(); i++) {
                    // matchCandidates.get(i)
