@@ -285,7 +285,7 @@ public class PatientEndpoint {
                       String resourceJson=FhirUtils.getFormattedData(matches.get(i), requestType);
                       //formattedData +="{\r\n\"resource\": \r\n"  + FhirUtils.getFormattedData(matches.get(i), requestType)+"\r\n }" ;
 
-                      formattedData +="{\r\n\"resource\": \r\n" + resourceJson+"\r\n"+  +patientLinkList+ "\r\n }" ;
+                      formattedData +="{\r\n\"resource\": \r\n" + resourceJson+"\r\n"+  patientLinkList+ "\r\n }" ;
   
                   }
                   formattedData = formattedData + "]}";
