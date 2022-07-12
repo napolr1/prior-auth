@@ -111,7 +111,7 @@
           "display": "Resource encoded in summary mode"
         } ],
         "profile" : [
-          "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L2"
+          "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1"
         ]
       },
       "identifier": [ {
@@ -241,7 +241,7 @@
           "code": "SUBSETTED",
           "display": "Resource encoded in summary mode"
         } ],"profile" : [
-          "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1"
+          "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0"
         ]
       },
       "identifier": [ {
@@ -287,7 +287,7 @@
       "gender": "female",
       "birthDate": "1976-12-10"
     }
-  }, 
+  }, idi_patient_l1
   {
     "fullUrl": "pat013",
     "resource": {
@@ -297,7 +297,7 @@
           "versionId": "1",
           "lastUpdated": "2019-06-13T09:55:51.116-04:00",
           "profile" : [
-            "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1"
+            "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0"
           ]
       },
       "text": {
