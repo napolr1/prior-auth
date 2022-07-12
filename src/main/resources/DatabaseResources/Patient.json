@@ -111,7 +111,7 @@
           "display": "Resource encoded in summary mode"
         } ],
         "profile" : [
-          "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient"
+          "http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L2"
         ]
       },
       "identifier": [ {
